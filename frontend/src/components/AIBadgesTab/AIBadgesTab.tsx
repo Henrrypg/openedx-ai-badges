@@ -42,6 +42,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
     handleGenerate,
     handleSave,
   } = useBadgeGeneration(uiSlotSelectorId, courseId, locationId);
+  const hasGeneratedBadge = Boolean(generatedBadge);
 
   // Automatically hide the form once a badge is successfully generated
   useEffect(() => {
@@ -55,7 +56,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
   };
 
   const onGenerateClick = async () => {
-    await handleGenerate(formData);
+    await handleGenerate(formData, hasGeneratedBadge ? 'regenerate' : 'run');
   };
 
   const showForm = () => setIsFormVisible(true);
@@ -70,6 +71,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
               formData={formData}
               onChange={handleFieldChange}
               onGenerate={onGenerateClick}
+              submitAction={hasGeneratedBadge ? 'regenerate' : 'run'}
               isGenerating={isGenerating}
               generationError={generationError}
             />
@@ -89,7 +91,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
                 onClick={showForm}
                 disabled={isGenerating}
               >
-                {intl.formatMessage(messages['openedx-ai-badges.badge-form.button.show-form'])}
+                {intl.formatMessage(messages['openedx-ai-badges.badge-form.button.regenerate'])}
               </Button>
             </div>
           )}
