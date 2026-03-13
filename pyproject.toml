@@ -26,7 +26,6 @@ classifiers = [
 dependencies = [
     "tutor>=20.0.0,<21.0.0",
     "tutor-mfe>=20.0.0,<21.0.0",
-    "openedx-ai-extensions @ git+https://github.com/openedx/openedx-ai-extensions.git",
 ]
 
 # these fields will be set by .hatch_build.py
@@ -51,9 +50,6 @@ Changelog = "https://github.com/openedx/openedx-ai-badges/blob/main/CHANGELOG.rs
 Community = "https://discuss.openedx.org"
 
 # hatch-specific configuration
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.metadata.hooks.custom]
 path = "tutor/.hatch_build.py"
 
