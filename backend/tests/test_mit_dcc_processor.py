@@ -9,13 +9,14 @@ Covers:
 - generate_badge (real API path via mocked requests): happy path and all
   error conditions
 """
+# pylint: disable=protected-access,redefined-outer-name
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests as req
 from django.conf import settings
 
 from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -86,6 +87,7 @@ REAL_API_RESPONSE = {
 
 @pytest.fixture
 def processor():
+    """Return a bare MITDCCProcessor instance."""
     return MITDCCProcessor(processor_config={})
 
 
@@ -94,6 +96,8 @@ def processor():
 # ---------------------------------------------------------------------------
 
 class TestBuildCourseInput:
+    """Tests for MITDCCProcessor._build_course_input."""
+
     def test_all_fields_joined(self, processor):
         result = processor._build_course_input(COURSE_CONTEXT)
         assert "Intro to Python" in result
@@ -120,6 +124,8 @@ class TestBuildCourseInput:
 # ---------------------------------------------------------------------------
 
 class TestParseApiResponse:
+    """Tests for MITDCCProcessor._parse_api_response."""
+
     def test_badge_extracted_from_achievement(self, processor):
         result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
         assert result["badge"] == REAL_API_RESPONSE["credentialSubject"]["achievement"]
@@ -187,6 +193,8 @@ class TestParseApiResponse:
 # ---------------------------------------------------------------------------
 
 class TestGenerateBadgeMock:
+    """Tests for MITDCCProcessor._mock_api_response."""
+
     def test_returns_badge_key(self, processor):
         result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
         assert "badge" in result
@@ -228,7 +236,10 @@ class TestGenerateBadgeMock:
 # ---------------------------------------------------------------------------
 
 class TestGenerateBadgeCallApi:
+    """Tests for MITDCCProcessor._call_api with mocked HTTP."""
+
     def _make_mock_response(self, json_data=None, status_code=200):
+        """Return a MagicMock mimicking a requests.Response."""
         mock_resp = MagicMock()
         mock_resp.status_code = status_code
         mock_resp.headers = {"content-type": "application/json", "content-length": "100"}
@@ -268,7 +279,6 @@ class TestGenerateBadgeCallApi:
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
     def test_connection_error_returns_error_dict(self, mock_post, processor):
-        import requests as req
         mock_post.side_effect = req.exceptions.ConnectionError("refused")
         result = processor._call_api(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
         assert "error" in result
@@ -276,7 +286,6 @@ class TestGenerateBadgeCallApi:
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
     def test_timeout_returns_error_dict(self, mock_post, processor):
-        import requests as req
         mock_post.side_effect = req.exceptions.Timeout("timed out")
         result = processor._call_api(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
         assert "error" in result
@@ -284,7 +293,6 @@ class TestGenerateBadgeCallApi:
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
     def test_http_error_returns_error_dict(self, mock_post, processor):
-        import requests as req
         mock_resp = self._make_mock_response(status_code=500)
         mock_resp.raise_for_status.side_effect = req.exceptions.HTTPError("500 Server Error")
         mock_post.return_value = mock_resp
@@ -314,6 +322,8 @@ class TestGenerateBadgeCallApi:
 # ---------------------------------------------------------------------------
 
 class TestApiUrlSetting:
+    """Tests for MITDCCProcessor.api_url Django settings integration."""
+
     def test_default_url(self, processor):
         assert processor.api_url == settings.MIT_DCC_BADGE_API_URL
 

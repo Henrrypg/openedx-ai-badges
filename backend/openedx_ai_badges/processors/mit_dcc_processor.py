@@ -52,6 +52,7 @@ class MITDCCProcessor:
             On success: normalised dict with keys ``badge``, optionally
                         ``skills``, and ``mit_dcc_*`` for every extra field
                         returned by the API.
+
             On error:   ``{"error": "<message>"}``
         """
         logger.info(
