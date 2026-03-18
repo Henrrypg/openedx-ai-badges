@@ -16,8 +16,6 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_API_URL = "http://badge-api:8000/api/v1/generate-badge-suggestions"
-
 
 class MITDCCProcessor:
     """
@@ -34,8 +32,8 @@ class MITDCCProcessor:
 
     @property
     def api_url(self):
-        """Return the MIT DCC API URL, overridable via Django settings."""
-        return getattr(settings, "MIT_DCC_BADGE_API_URL", _DEFAULT_API_URL)
+        """Return the MIT DCC API URL, configured via Django settings."""
+        return settings.MIT_DCC_BADGE_API_URL
 
     # ------------------------------------------------------------------
     # Public entry point

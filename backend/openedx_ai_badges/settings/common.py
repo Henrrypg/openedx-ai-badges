@@ -29,3 +29,8 @@ def plugin_settings(settings):
     badges_workflow_dir = BASE_DIR / "workflows" / "profiles"
     if badges_workflow_dir not in settings.WORKFLOW_TEMPLATE_DIRS:
         settings.WORKFLOW_TEMPLATE_DIRS.append(badges_workflow_dir)
+
+    # -------------------------
+    # MIT DCC Badge API
+    # -------------------------
+    settings.MIT_DCC_BADGE_API_URL = "http://mit-slm:8000/api/v1/generate-badge-suggestions"
