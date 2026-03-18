@@ -12,11 +12,9 @@ Covers:
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.conf import settings
 
-from openedx_ai_badges.processors.mit_dcc_processor import (
-    MITDCCProcessor,
-    _DEFAULT_API_URL,
-)
+from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +264,7 @@ class TestGenerateBadgeCallApi:
         mock_post.return_value = self._make_mock_response(REAL_API_RESPONSE)
         processor._call_api(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
         args, _ = mock_post.call_args
-        assert args[0] == _DEFAULT_API_URL
+        assert args[0] == settings.MIT_DCC_BADGE_API_URL
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
     def test_connection_error_returns_error_dict(self, mock_post, processor):
@@ -317,7 +315,7 @@ class TestGenerateBadgeCallApi:
 
 class TestApiUrlSetting:
     def test_default_url(self, processor):
-        assert processor.api_url == _DEFAULT_API_URL
+        assert processor.api_url == settings.MIT_DCC_BADGE_API_URL
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.settings")
     def test_overridden_by_django_setting(self, mock_settings, processor):
