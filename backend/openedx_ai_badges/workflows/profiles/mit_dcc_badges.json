@@ -1,0 +1,27 @@
+{
+  "orchestrator_class": "openedx_ai_badges.workflows.orchestrators.MITDCCBadgeOrchestrator",
+  "processor_config": {
+      "OpenEdXProcessor": {
+        "function": "get_course_info",
+        "fields": ["title", "short_description", "description", "overview"]
+      }
+  },
+  "actuator_config": {
+    "UIComponents": {
+      "request": {
+        "component": "AIRequestBadgesComponent",
+        "config": {
+          "buttonText": "+",
+          "customMessage": "Generate a badge via MIT DCC"
+        }
+      },
+      "response": {
+        "component": "AIResponseComponent",
+        "config": {
+          "customMessage": ""
+        }
+      }
+    }
+  },
+  "schema_version": "1.0"
+}

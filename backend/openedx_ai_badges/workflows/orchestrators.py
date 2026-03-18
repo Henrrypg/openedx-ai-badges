@@ -12,6 +12,7 @@ from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator im
 )
 
 from openedx_ai_badges.processors.badge_processor import BadgeProcessor, SkillsProcessor
+from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -246,3 +247,60 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 'error': f"Failed to parse badge response: {str(e)}",
                 'status': 'error'
             }
+
+
+class MITDCCBadgeOrchestrator(BadgeOrchestrator):
+    """
+    Orchestrator that delegates badge generation to the MIT DCC remote API
+    instead of running local LLM processors.
+
+    The workflow is:
+      1. Extract course context via OpenEdXProcessor (same as base).
+      2. POST the course context + user input to the MIT DCC API.
+      3. Parse and normalise the response into the same shape that
+         BadgeOrchestrator produces so the existing UI works unchanged.
+
+    The ``save`` action is inherited from BadgeOrchestrator without changes.
+    """
+
+    def run(self, input_data):
+        """
+        Execute badge generation via the MIT DCC remote API.
+
+        Args:
+            input_data: dict containing user form fields (style, tone, level,
+                        criterion, skillsEnabled, …)
+        Returns:
+            dict: ``{"response": complete_info, "status": "completed"}``
+        """
+        if self.session.metadata.get('complete_info'):
+            return {
+                "response": self.session.metadata['complete_info'],
+                "status": "completed",
+            }
+
+        course_context = self._get_course_context()
+        if isinstance(course_context, dict) and 'error' in course_context:
+            return course_context
+
+        processor = MITDCCProcessor(self.profile.processor_config)
+        api_result = processor.generate_badge(
+            course_context=course_context,
+            input_data=input_data,
+        )
+
+        if isinstance(api_result, dict) and 'error' in api_result:
+            return {**api_result, 'status': 'error'}
+
+        complete_info = {
+            'course_context': course_context,
+            **api_result,
+        }
+
+        self.session.metadata['complete_info'] = complete_info
+        self.session.save(update_fields=['metadata'])
+
+        return {
+            "response": complete_info,
+            "status": "completed",
+        }
