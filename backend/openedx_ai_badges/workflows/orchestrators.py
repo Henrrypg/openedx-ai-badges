@@ -279,10 +279,12 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
                 "status": "completed",
             }
 
+        self._set_status_message("Fetching course content...")
         course_context = self._get_course_context()
         if isinstance(course_context, dict) and 'error' in course_context:
             return course_context
 
+        self._set_status_message("Generating badge via MIT DCC API...")
         processor = MITDCCProcessor(self.profile.processor_config)
         api_result = processor.generate_badge(
             course_context=course_context,
