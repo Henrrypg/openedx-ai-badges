@@ -12,7 +12,8 @@
         "component": "AIRequestBadgesComponent",
         "config": {
           "buttonText": "+",
-          "customMessage": "Uses experimental mit-slm service with the MITDCCBadgeOrchestrator"
+          "customMessage": "Uses experimental mit-slm service with the MITDCCBadgeOrchestrator",
+          "apiStatusEnabled": "true"
         }
       },
       "response": {

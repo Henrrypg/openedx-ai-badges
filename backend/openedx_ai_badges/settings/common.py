@@ -34,3 +34,6 @@ def plugin_settings(settings):
     # MIT DCC Badge API
     # -------------------------
     settings.MIT_DCC_BADGE_API_URL = "http://mit-slm:8000/api/v1/generate-badge-suggestions"
+    settings.MIT_SLM_OLLAMA_URL = ""
+    settings.MIT_SLM_OLLAMA_TOKEN = ""
+    settings.MIT_DCC_BADGE_API_HEALTH_URL = "http://mit-slm:8000/health"

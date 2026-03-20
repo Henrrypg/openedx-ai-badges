@@ -3,6 +3,11 @@ Badge Orchestrator - Generates Open Badges 3.0 BadgeClass via async Celery tasks
 """
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
+
+import requests
+from django.conf import settings
 
 # pylint: disable=import-error
 from openedx_ai_extensions.processors import OpenEdXProcessor
@@ -262,6 +267,59 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
 
     The ``save`` action is inherited from BadgeOrchestrator without changes.
     """
+
+    def get_api_status(self, input_data):  # pylint: disable=unused-argument
+        """
+        Check availability of the external services used by this orchestrator.
+
+        Args:
+            input_data: accepted for framework compatibility but not used.
+
+        Returns:
+            dict: service statuses keyed by service name.
+        """
+        health_url = getattr(settings, 'MIT_DCC_BADGE_API_HEALTH_URL', '')
+        ollama_url = getattr(settings, 'MIT_SLM_OLLAMA_URL', '')
+        ollama_token = getattr(settings, 'MIT_SLM_OLLAMA_TOKEN', '')
+
+        def check_badge_api():
+            if not health_url:
+                return 'not_configured'
+            try:
+                resp = requests.get(health_url, timeout=5)
+                return 'online' if resp.ok else 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                return 'unavailable'
+
+        def check_ollama():
+            if not ollama_url:
+                return 'not_configured'
+            parsed = urlparse(ollama_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            tags_url = f"{base_url}/api/tags"
+            headers = {}
+            if ollama_token:
+                headers['Authorization'] = f'Bearer {ollama_token}'
+            try:
+                resp = requests.get(tags_url, headers=headers, timeout=5)
+                return 'online' if resp.ok else 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                return 'unavailable'
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            badge_api_future = executor.submit(check_badge_api)
+            ollama_future = executor.submit(check_ollama)
+            badge_api_status = badge_api_future.result()
+            ollama_status = ollama_future.result()
+
+        return {
+            'services': {
+                'badge_api': {'status': badge_api_status, 'required': True},
+                'ollama': {'status': ollama_status, 'required': True},
+                'image_api': {'status': 'not_configured', 'required': False},
+                'laiser_api': {'status': 'not_configured', 'required': False},
+            }
+        }
 
     def run(self, input_data):
         """

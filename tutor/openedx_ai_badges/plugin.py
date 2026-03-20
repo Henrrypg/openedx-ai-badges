@@ -59,6 +59,7 @@ hooks.Filters.CONFIG_DEFAULTS.add_items(
         ("MIT_SLM_OLLAMA_TOKEN", ""),
         ("MIT_SLM_MODEL_NAME", "phi4-chat"),
         ("MIT_SLM_OLLAMA_PRELOAD", "false"),
+        ("MIT_DCC_BADGE_API_HEALTH_URL", "http://mit-slm:8000/health"),
     ]
 )
 

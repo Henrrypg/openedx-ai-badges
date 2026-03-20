@@ -16,8 +16,10 @@ import {
 import { BadgeFormData } from '../../types/badges';
 import { DEFAULT_FORM_DATA } from '../../constants/formOptions';
 import { useBadgeGeneration } from '../../hooks/useBadgeGeneration';
+import { useApiStatus } from '../../hooks/useApiStatus';
 import BadgeOptionsForm from './BadgeOptionsForm';
 import BadgePreview from './BadgePreview';
+import ApiStatusPanel from './ApiStatusPanel';
 import messages from '../../messages';
 
 import './AIBadgesTab.scss';
@@ -36,6 +38,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
   const [isFormVisible, setIsFormVisible] = useState(true);
 
   const {
+    contextData,
     isLoadingProfile,
     profileConfig,
     isGenerating,
@@ -46,6 +49,14 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
     handleSave,
   } = useBadgeGeneration(courseId, uiSlotSelectorId, locationId);
   const hasGeneratedBadge = Boolean(generatedBadge);
+
+  const apiStatusEnabled = profileConfig?.request?.config?.apiStatusEnabled === 'true';
+  const {
+    services: apiServices,
+    isLoading: isApiStatusLoading,
+    isServicesReady,
+    refresh: refreshApiStatus,
+  } = useApiStatus(contextData, apiStatusEnabled);
 
   // Automatically hide the form once a badge is successfully generated
   useEffect(() => {
@@ -96,15 +107,25 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
         {/* Left section: Badge Options Form or Edition Instructions */}
         <Col lg={4} className="d-flex flex-column p-4">
           {isFormVisible ? (
-            <BadgeOptionsForm
-              formData={formData}
-              onChange={handleFieldChange}
-              onGenerate={onGenerateClick}
-              submitAction={hasGeneratedBadge ? 'regenerate' : 'run'}
-              isGenerating={isGenerating}
-              generationError={generationError}
-              customMessage={customMessage}
-            />
+            <>
+              <BadgeOptionsForm
+                formData={formData}
+                onChange={handleFieldChange}
+                onGenerate={onGenerateClick}
+                submitAction={hasGeneratedBadge ? 'regenerate' : 'run'}
+                isGenerating={isGenerating}
+                generationError={generationError}
+                customMessage={customMessage}
+                isServicesReady={isServicesReady}
+              />
+              {apiStatusEnabled && (
+                <ApiStatusPanel
+                  services={apiServices}
+                  isLoading={isApiStatusLoading}
+                  refresh={refreshApiStatus}
+                />
+              )}
+            </>
           ) : (
             <div className="edition-instructions">
               <h2 className="mb-4 text-primary">
