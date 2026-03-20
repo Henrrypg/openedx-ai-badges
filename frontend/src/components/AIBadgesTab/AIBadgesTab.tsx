@@ -39,6 +39,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
     isLoadingProfile,
     profileConfig,
     isGenerating,
+    statusMessage,
     generationError,
     generatedBadge,
     handleGenerate,
@@ -133,6 +134,7 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
         >
           <BadgePreview
             isGenerating={isGenerating}
+            statusMessage={statusMessage}
             generatedBadge={generatedBadge}
             onSave={handleSave}
           />

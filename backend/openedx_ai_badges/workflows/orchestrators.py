@@ -1,12 +1,15 @@
 """
-Simple Custom Orchestrator - Demonstrates orchestrator pattern
+Badge Orchestrator - Generates Open Badges 3.0 BadgeClass via async Celery tasks.
 """
 import json
 import logging
 
 # pylint: disable=import-error
 from openedx_ai_extensions.processors import OpenEdXProcessor
-from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator import SessionBasedOrchestrator
+from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator import (
+    SessionBasedOrchestrator,
+    _execute_orchestrator_async,
+)
 
 from openedx_ai_badges.processors.badge_processor import BadgeProcessor, SkillsProcessor
 
@@ -79,6 +82,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         input_data['previous_badge'] = complete_info.get('badge')
         input_data['previous_skills'] = complete_info.get('skills')
 
+        self._set_status_message("Fetching course content...")
         course_context = self._get_course_context()
         if isinstance(course_context, dict) and 'error' in course_context:
             return course_context
@@ -86,11 +90,13 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         complete_info = {}
         complete_info['course_context'] = course_context
         if skills_requested:
+            self._set_status_message("Generating skills alignment...")
             skills = self._get_skills(course_context, input_data, regenerate=True)
             if isinstance(skills, dict) and 'error' in skills:
                 return skills
             complete_info['skills'] = skills
 
+        self._set_status_message("Generating badge definition...")
         badge = self._get_badge(complete_info, input_data, regenerate=True)
         if isinstance(badge, dict) and 'error' in badge:
             return badge
@@ -102,6 +108,36 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         return {
             "response": complete_info,
             "status": "completed",
+        }
+
+    def regenerate_async(self, input_data):
+        """
+        Launch async task to execute the regenerate method.
+
+        Args:
+            input_data: Input data to pass to the regenerate method
+        """
+        self.session.course_id = self.course_id
+        self.session.location_id = self.location_id
+        self.session.metadata = self.session.metadata or {}
+        self.session.metadata['task_status'] = 'processing'
+        self.session.metadata.pop('task_result', None)
+        self.session.metadata.pop('task_error', None)
+        self.session.metadata.pop('task_status_message', None)
+        self.session.save()
+
+        task = _execute_orchestrator_async.delay(
+            session_id=self.session.id,
+            action='regenerate',
+            params={
+                "input_data": input_data,
+            }
+        )
+
+        return {
+            'status': 'processing',
+            'task_id': task.id,
+            'message': 'AI workflow has started',
         }
 
     def run(self, input_data):
@@ -119,6 +155,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 "status": "completed",
             }
 
+        self._set_status_message("Fetching course content...")
         course_context = self._get_course_context()
         if isinstance(course_context, dict) and 'error' in course_context:
             return course_context
@@ -126,11 +163,13 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         complete_info = {}
         complete_info['course_context'] = course_context
         if input_data.get('skills_enabled', False) or input_data.get('skillsEnabled', False):
+            self._set_status_message("Generating skills alignment...")
             skills = self._get_skills(course_context, input_data)
             if isinstance(skills, dict) and 'error' in skills:
                 return skills
             complete_info['skills'] = skills
 
+        self._set_status_message("Generating badge definition...")
         badge = self._get_badge(complete_info, input_data)
         if isinstance(badge, dict) and 'error' in badge:
             return badge

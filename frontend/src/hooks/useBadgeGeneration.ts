@@ -1,5 +1,5 @@
 import {
-  useState, useCallback, useEffect, useMemo,
+  useState, useCallback, useEffect, useRef, useMemo,
 } from 'react';
 import { services } from '@openedx/openedx-ai-extensions-ui';
 import {
@@ -10,6 +10,8 @@ import {
   ProfileConfig,
 } from '../types/badges';
 
+const POLL_INTERVAL_MS = 5000;
+
 interface UseBadgeGenerationReturn {
   /** Whether the initial profile fetch is still in flight. */
   isLoadingProfile: boolean;
@@ -17,6 +19,8 @@ interface UseBadgeGenerationReturn {
   profileConfig: ProfileConfig | null;
   /** Whether a generation or save request is in flight. */
   isGenerating: boolean;
+  /** The current step message during async generation, or null. */
+  statusMessage: string | null;
   /** The error message from the last failed request, or null. */
   generationError: string | null;
   /** The AI-generated badge data, or null if not yet generated. */
@@ -35,6 +39,14 @@ interface UseBadgeGenerationReturn {
  * On mount it fetches the workflow profile for the given course/location to
  * determine whether a badge workflow is configured and to retrieve any
  * actuator_config UIComponents settings (customMessage, buttonText, …).
+ *
+ * Badge generation and regeneration are always async: they dispatch a Celery
+ * task via run_async / regenerate_async and then poll get_run_status every
+ * POLL_INTERVAL_MS milliseconds until completion or error.
+ *
+ * On mount, after the profile is fetched, the hook also checks whether an
+ * async task is already running (e.g. the user closed and reopened the tab
+ * mid-generation) and resumes polling automatically if so.
  */
 export const useBadgeGeneration = (
   courseId: string | null,
@@ -44,14 +56,75 @@ export const useBadgeGeneration = (
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [profileConfig, setProfileConfig] = useState<ProfileConfig | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<any>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [generatedBadge, setGeneratedBadge] = useState<GeneratedBadge | null>(null);
+
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollingCancelledRef = useRef(false);
 
   const contextData = useMemo(
     () => services.prepareContextData({ uiSlotSelectorId, courseId, locationId }),
     [courseId, locationId, uiSlotSelectorId],
   );
 
+  const stopPolling = useCallback(() => {
+    pollingCancelledRef.current = true;
+    if (pollTimeoutRef.current !== null) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  }, []);
+
+  /** Poll get_run_status until the task completes, errors, or times out.
+   *  Uses a self-scheduling setTimeout so no two requests are ever in-flight
+   *  simultaneously. Responses arriving after stopPolling()/unmount are
+   *  discarded via pollingCancelledRef. */
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollingCancelledRef.current = false;
+
+    const scheduleNext = () => {
+      pollTimeoutRef.current = setTimeout(async () => {
+        if (pollingCancelledRef.current) { return; }
+
+        try {
+          const result = await services.callWorkflowService({
+            payload: { action: 'get_run_status', userInput: {} },
+            context: contextData,
+          });
+
+          if (pollingCancelledRef.current) { return; }
+
+          if (result.status === 'processing') {
+            setStatusMessage(result.message ?? 'Processing...');
+            scheduleNext();
+          } else if (result.status === 'completed') {
+            stopPolling();
+            setGeneratedBadge(result.response as GeneratedBadge);
+            setStatusMessage(null);
+            setIsGenerating(false);
+          } else {
+            // 'error' or 'timeout'
+            stopPolling();
+            setGenerationError(result.error ?? 'Generation failed');
+            setStatusMessage(null);
+            setIsGenerating(false);
+          }
+        } catch (err) {
+          if (pollingCancelledRef.current) { return; }
+          stopPolling();
+          setGenerationError(err instanceof Error ? err.message : 'An unexpected error occurred');
+          setStatusMessage(null);
+          setIsGenerating(false);
+        }
+      }, POLL_INTERVAL_MS);
+    };
+
+    scheduleNext();
+  }, [contextData, stopPolling]);
+
+  // Fetch profile on mount, then check whether a task is already in flight.
   useEffect(() => {
     const abortController = new AbortController();
 
@@ -63,8 +136,33 @@ export const useBadgeGeneration = (
           configEndpoint: services.getDefaultEndpoint('profile'),
           signal: abortController.signal,
         });
-        if (!abortController.signal.aborted) {
-          setProfileConfig(config as ProfileConfig | null);
+        if (abortController.signal.aborted) { return; }
+
+        setProfileConfig(config as ProfileConfig | null);
+
+        // After profile loads, check whether a task is already running.
+        if (config) {
+          try {
+            const statusResult = await services.callWorkflowService({
+              payload: { action: 'get_run_status', userInput: {} },
+              context: contextData,
+            });
+
+            if (abortController.signal.aborted) { return; }
+
+            if (statusResult.status === 'processing') {
+              setIsGenerating(true);
+              setStatusMessage(statusResult.message ?? 'Processing...');
+              startPolling();
+            } else if (statusResult.status === 'completed' && statusResult.response) {
+              setGeneratedBadge(statusResult.response as GeneratedBadge);
+            } else if (statusResult.status === 'error' || statusResult.status === 'timeout') {
+              setGenerationError(statusResult.error ?? 'Previous generation failed');
+            }
+            // 'idle' → no task has ever run, stay silent
+          } catch {
+            // No session yet — that's fine, user hasn't generated anything.
+          }
         }
       } catch (err: any) {
         if (!abortController.signal.aborted) {
@@ -78,47 +176,75 @@ export const useBadgeGeneration = (
     };
 
     fetchProfile();
-    return () => abortController.abort();
-  }, [contextData]);
+    return () => {
+      abortController.abort();
+      stopPolling();
+    };
+  }, [contextData, startPolling, stopPolling]);
 
   /**
-   * Internal helper — calls the workflow service and updates state.
+   * Dispatch an async workflow action (run_async / regenerate_async) then
+   * start polling for the result.
    */
-  const callWorkflow = useCallback(
-    async (action: string, userInput: unknown) => {
+  const callWorkflowAsync = useCallback(
+    async (asyncAction: string, userInput: unknown) => {
       setIsGenerating(true);
       setGenerationError(null);
+      setStatusMessage(null);
 
       try {
-        const result = await services.callWorkflowService({
-          payload: { action, userInput },
+        const initResult = await services.callWorkflowService({
+          payload: { action: asyncAction, userInput },
           context: contextData,
         });
 
-        setGeneratedBadge(result.response as GeneratedBadge);
+        if (initResult.status !== 'processing') {
+          // Unexpected non-processing response — handle explicitly.
+          if (initResult.status === 'error' || initResult.status === 'timeout') {
+            setGenerationError(initResult.error ?? 'Generation failed');
+          } else if (initResult.status === 'completed' && initResult.response) {
+            setGeneratedBadge(initResult.response as GeneratedBadge);
+          }
+          setStatusMessage(null);
+          setIsGenerating(false);
+          return;
+        }
+
+        setStatusMessage(initResult.message ?? 'Processing...');
+        startPolling();
       } catch (error: unknown) {
-        setGenerationError(error);
-      } finally {
+        setGenerationError(error instanceof Error ? error.message : 'An unexpected error occurred');
+        setStatusMessage(null);
         setIsGenerating(false);
       }
     },
-    [contextData],
+    [contextData, startPolling],
   );
 
-  /** Generate a new badge using the form data. */
+  /** Generate or regenerate a badge — always dispatched as an async task. */
   const handleGenerate = useCallback(
-    (formData: BadgeFormData, action: BadgeWorkflowAction = 'run') => callWorkflow(action, formData),
-    [callWorkflow],
+    (formData: BadgeFormData, action: BadgeWorkflowAction = 'run') => {
+      const asyncAction = action === 'regenerate' ? 'regenerate_async' : 'run_async';
+      return callWorkflowAsync(asyncAction, formData);
+    },
+    [callWorkflowAsync],
   );
 
-  /** Save an individual section back to the backend. */
+  /** Save an individual section back to the backend — stays synchronous. */
   const handleSave = useCallback(
-    (key: BadgeSectionKey, value: unknown) => {
-      // Backend expects snake_case keys
+    async (key: BadgeSectionKey, value: unknown) => {
       const backendKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-      return callWorkflow('save', { key: backendKey, value });
+      try {
+        const result = await services.callWorkflowService({
+          payload: { action: 'save', userInput: { key: backendKey, value } },
+          context: contextData,
+        });
+        setGeneratedBadge(result.response as GeneratedBadge);
+      } catch (error: unknown) {
+        setGenerationError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      }
     },
-    [callWorkflow],
+    [contextData],
   );
 
   /** Update a badge section locally without hitting the backend. */
@@ -133,6 +259,7 @@ export const useBadgeGeneration = (
     isLoadingProfile,
     profileConfig,
     isGenerating,
+    statusMessage,
     generationError,
     generatedBadge,
     handleGenerate,

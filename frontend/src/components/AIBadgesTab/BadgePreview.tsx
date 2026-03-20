@@ -16,6 +16,8 @@ const BADGE_SECTIONS: { key: BadgeSectionKey; title: { id: string; defaultMessag
 interface BadgePreviewProps {
   /** Whether a generation or save request is in progress. */
   isGenerating: boolean;
+  /** Current step message from the async task, or null. */
+  statusMessage?: string | null;
   /** The AI-generated badge data, or null. */
   generatedBadge: GeneratedBadge | null;
   /** Called when the user saves an individual section. */
@@ -28,6 +30,7 @@ interface BadgePreviewProps {
  */
 const BadgePreview = ({
   isGenerating,
+  statusMessage = null,
   generatedBadge,
   onSave,
 }: BadgePreviewProps) => {
@@ -35,7 +38,7 @@ const BadgePreview = ({
   const [editingSection, setEditingSection] = useState<BadgeSectionKey | null>(null);
 
   if (isGenerating && !generatedBadge) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner message={statusMessage ?? undefined} />;
   }
 
   if (!generatedBadge) {
