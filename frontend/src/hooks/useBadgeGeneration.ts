@@ -13,6 +13,8 @@ import {
 const POLL_INTERVAL_MS = 5000;
 
 interface UseBadgeGenerationReturn {
+  /** Context data prepared for workflow service calls — share with sibling hooks. */
+  contextData: ReturnType<typeof services.prepareContextData>;
   /** Whether the initial profile fetch is still in flight. */
   isLoadingProfile: boolean;
   /** Profile config from the backend, or null if none is configured. */
@@ -256,6 +258,7 @@ export const useBadgeGeneration = (
   );
 
   return {
+    contextData,
     isLoadingProfile,
     profileConfig,
     isGenerating,

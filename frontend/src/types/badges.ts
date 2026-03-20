@@ -100,3 +100,17 @@ export interface SavePayload {
 
 /** Union of all workflow payloads. */
 export type WorkflowPayload = GeneratePayload | SavePayload;
+
+/** Possible status values for an external API service. */
+export type ApiServiceStatus = 'online' | 'unavailable' | 'not_configured' | 'starting';
+
+/** Status and requirement flag for a single external service. */
+export interface ApiService {
+  status: ApiServiceStatus;
+  required: boolean;
+}
+
+/** Response shape from the get_api_status workflow action. */
+export interface ApiStatusResult {
+  services: Record<string, ApiService>;
+}

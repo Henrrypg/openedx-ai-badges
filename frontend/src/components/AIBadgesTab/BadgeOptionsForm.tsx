@@ -24,6 +24,8 @@ interface BadgeOptionsFormProps {
   generationError: string | null;
   /** Optional workflow-specific message from the profile actuator_config. */
   customMessage?: string;
+  /** When false, the Generate button is disabled (e.g. required services are down). Defaults to true. */
+  isServicesReady?: boolean;
 }
 
 /** Ordered list of selectable fields to render. */
@@ -42,6 +44,7 @@ const BadgeOptionsForm = ({
   isGenerating,
   generationError,
   customMessage,
+  isServicesReady = true,
 }: BadgeOptionsFormProps) => {
   const intl = useIntl();
   const isRegenerate = submitAction === 'regenerate';
@@ -100,7 +103,7 @@ const BadgeOptionsForm = ({
           <StatefulButton
             state={isGenerating ? 'pending' : 'default'}
             onClick={onGenerate}
-            disabled={isGenerating}
+            disabled={isGenerating || !isServicesReady}
             labels={{
               default: intl.formatMessage(messages[isRegenerate
                 ? 'openedx-ai-badges.badge-form.button.regenerate'

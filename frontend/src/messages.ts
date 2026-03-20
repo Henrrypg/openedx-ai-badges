@@ -264,6 +264,64 @@ const messages = defineMessages({
     defaultMessage: '<bold>Your badge has been generated successfully!</bold> <br></br> You can now review and edit each section independently using the edit icons. Once you are satisfied, the badge will be saved to the course.',
     description: 'Instructions shown after badge generation',
   },
+
+  // API Status panel
+  'openedx-ai-badges.api-status.title': {
+    id: 'openedx-ai-badges.api-status.title',
+    defaultMessage: 'Service Status',
+    description: 'Title for the API status panel',
+  },
+  'openedx-ai-badges.api-status.online': {
+    id: 'openedx-ai-badges.api-status.online',
+    defaultMessage: 'Online',
+    description: 'Status label when a service is online',
+  },
+  'openedx-ai-badges.api-status.unavailable': {
+    id: 'openedx-ai-badges.api-status.unavailable',
+    defaultMessage: 'Unavailable',
+    description: 'Status label when a service is unavailable',
+  },
+  'openedx-ai-badges.api-status.not-configured': {
+    id: 'openedx-ai-badges.api-status.not-configured',
+    defaultMessage: 'Not configured',
+    description: 'Status label when a service is not configured',
+  },
+  'openedx-ai-badges.api-status.starting': {
+    id: 'openedx-ai-badges.api-status.starting',
+    defaultMessage: 'Starting',
+    description: 'Status label when a service is warming up (e.g. Ollama loading a model)',
+  },
+  'openedx-ai-badges.api-status.services-offline': {
+    id: 'openedx-ai-badges.api-status.services-offline',
+    defaultMessage: 'Required services are offline. Badge generation is disabled.',
+    description: 'Alert shown when one or more required services are unavailable',
+  },
+  'openedx-ai-badges.api-status.refresh': {
+    id: 'openedx-ai-badges.api-status.refresh',
+    defaultMessage: 'Refresh status',
+    description: 'Tooltip / aria-label for the refresh button in the API status panel',
+  },
+  'openedx-ai-badges.api-status.service.badge-api': {
+    id: 'openedx-ai-badges.api-status.service.badge-api',
+    defaultMessage: 'Badge Generation API',
+    description: 'Display name for the badge generation API service',
+  },
+  'openedx-ai-badges.api-status.service.ollama': {
+    id: 'openedx-ai-badges.api-status.service.ollama',
+    defaultMessage: 'Ollama Model',
+    description: 'Display name for the Ollama model service',
+  },
+  // Planned for future PR:
+  // 'openedx-ai-badges.api-status.service.image-api': {
+  //   id: 'openedx-ai-badges.api-status.service.image-api',
+  //   defaultMessage: 'Image Generation API',
+  //   description: 'Display name for the image generation API service',
+  // },
+  // 'openedx-ai-badges.api-status.service.laiser-api': {
+  //   id: 'openedx-ai-badges.api-status.service.laiser-api',
+  //   defaultMessage: 'LAiSER API',
+  //   description: 'Display name for the LAiSER skill extraction service',
+  // },
 });
 
 export default messages;

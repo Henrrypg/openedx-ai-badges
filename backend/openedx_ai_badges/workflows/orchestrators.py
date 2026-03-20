@@ -3,8 +3,11 @@ Badge Orchestrator - Generates Open Badges 3.0 BadgeClass via async Celery tasks
 """
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse
 
-# pylint: disable=import-error
+import requests
+from django.conf import settings
 from openedx_ai_extensions.processors import OpenEdXProcessor
 from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator import (
     SessionBasedOrchestrator,
@@ -12,6 +15,7 @@ from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator im
 )
 
 from openedx_ai_badges.processors.badge_processor import BadgeProcessor, SkillsProcessor
+from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -246,3 +250,182 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 'error': f"Failed to parse badge response: {str(e)}",
                 'status': 'error'
             }
+
+
+class MITDCCBadgeOrchestrator(BadgeOrchestrator):
+    """
+    Orchestrator that delegates badge generation to the MIT DCC remote API
+    instead of running local LLM processors.
+
+    The workflow is:
+      1. Extract course context via OpenEdXProcessor (same as base).
+      2. POST the course context + user input to the MIT DCC API.
+      3. Parse and normalise the response into the same shape that
+         BadgeOrchestrator produces so the existing UI works unchanged.
+
+    The ``save`` action is inherited from BadgeOrchestrator without changes.
+    """
+
+    def get_api_status(self, input_data):  # pylint: disable=unused-argument
+        """
+        Check availability of the external services used by this orchestrator.
+
+        Args:
+            input_data: accepted for framework compatibility but not used.
+
+        Returns:
+            dict: service statuses keyed by service name.
+        """
+        health_url = getattr(settings, 'MIT_DCC_BADGE_API_HEALTH_URL', '')
+        ollama_url = getattr(settings, 'MIT_SLM_OLLAMA_URL', '')
+        ollama_token = getattr(settings, 'MIT_SLM_OLLAMA_TOKEN', '')
+
+        def check_badge_api():
+            if not health_url:
+                return 'not_configured'
+            try:
+                resp = requests.get(health_url, timeout=5)
+                return 'online' if resp.ok else 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                return 'unavailable'
+
+        def check_ollama():
+            if not ollama_url:
+                return 'not_configured'
+            parsed = urlparse(ollama_url)
+            base_url = f"{parsed.scheme}://{parsed.netloc}"
+            tags_url = f"{base_url}/api/tags"
+            headers = {}
+            if ollama_token:
+                headers['Authorization'] = f'Bearer {ollama_token}'
+            try:
+                resp = requests.get(tags_url, headers=headers, timeout=5)
+                if not resp.ok:
+                    return 'unavailable'
+                try:
+                    data = resp.json()
+                except ValueError:
+                    return 'unavailable'
+                models = data.get('models', [])
+                if isinstance(models, list) and len(models) > 0:
+                    return 'online'
+                if isinstance(models, list):
+                    return 'starting'
+                return 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                return 'unavailable'
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            badge_api_future = executor.submit(check_badge_api)
+            ollama_future = executor.submit(check_ollama)
+            badge_api_status = badge_api_future.result()
+            ollama_status = ollama_future.result()
+
+        return {
+            'services': {
+                'badge_api': {'status': badge_api_status, 'required': True},
+                'ollama': {'status': ollama_status, 'required': True},
+                # 'image_api': {'status': 'not_configured', 'required': False},  # planned for future PR
+                # 'laiser_api': {'status': 'not_configured', 'required': False},  # planned for future PR
+            }
+        }
+
+    def run(self, input_data):
+        """
+        Execute badge generation via the MIT DCC remote API.
+
+        Args:
+            input_data: dict containing user form fields (style, tone, level,
+                        criterion, skillsEnabled, …)
+        Returns:
+            dict: ``{"response": complete_info, "status": "completed"}``
+        """
+        if self.session.metadata.get('complete_info'):
+            return {
+                "response": self.session.metadata['complete_info'],
+                "status": "completed",
+            }
+
+        self._set_status_message("Fetching course content...")
+        course_context = self._get_course_context()
+        if isinstance(course_context, dict) and 'error' in course_context:
+            return course_context
+
+        self._set_status_message("Generating badge via MIT DCC API...")
+        processor = MITDCCProcessor(self.profile.processor_config)
+        api_result = processor.generate_badge(
+            course_context=course_context,
+            input_data=input_data,
+        )
+
+        if isinstance(api_result, dict) and 'error' in api_result:
+            return {**api_result, 'status': 'error'}
+
+        complete_info = {
+            'course_context': course_context,
+            **api_result,
+        }
+
+        self.session.metadata['complete_info'] = complete_info
+        self.session.save(update_fields=['metadata'])
+
+        return {
+            "response": complete_info,
+            "status": "completed",
+        }
+
+    def regenerate(self, input_data):
+        """
+        Re-generate badge via the MIT DCC remote API, passing the previous
+        badge result as additional context so the model can improve on it.
+
+        Args:
+            input_data: dict containing updated user form fields
+        Returns:
+            dict: ``{"response": complete_info, "status": "completed"}``
+        """
+        if not self.session.metadata.get('complete_info'):
+            return {
+                "error": "No previous generation found to regenerate from.",
+                "status": "error",
+            }
+
+        previous_complete_info = self.session.metadata['complete_info']
+
+        if not previous_complete_info.get('badge'):
+            return {
+                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
+                "status": "error",
+            }
+
+        self._set_status_message("Fetching course content...")
+        course_context = self._get_course_context()
+        if isinstance(course_context, dict) and 'error' in course_context:
+            return course_context
+
+        self._set_status_message("Regenerating badge via MIT DCC API...")
+        processor = MITDCCProcessor(self.profile.processor_config)
+        api_result = processor.generate_badge(
+            course_context=course_context,
+            input_data={
+                **input_data,
+                'previous_badge': previous_complete_info.get('badge'),
+                'previous_skills': previous_complete_info.get('skills'),
+            },
+        )
+
+        if isinstance(api_result, dict) and 'error' in api_result:
+            return {**api_result, 'status': 'error'}
+
+        complete_info = {
+            'course_context': course_context,
+            **api_result,
+        }
+
+        self.session.metadata['complete_info'] = complete_info
+        self.session.save(update_fields=['metadata'])
+
+        return {
+            "response": complete_info,
+            "status": "completed",
+        }

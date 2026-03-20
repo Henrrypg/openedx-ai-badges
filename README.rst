@@ -143,6 +143,28 @@ Code Standards
 - Follow the CI instructions on code quality.
 
 
+MIT SLM Integration (Experimental)
+************************************
+
+In addition to the default LLM-based badge generation, this plugin ships an
+alternative orchestrator that delegates to the **MIT DCC Badge API** — a remote
+service powered by a fine-tuned ``phi4-chat`` small language model running on
+`Ollama <https://ollama.com>`_, with optional skill extraction via the LAISER
+model.
+
+To use it:
+
+1. Set ``RUN_MIT_SLM=true`` in your Tutor config and configure
+   ``MIT_SLM_OLLAMA_URL`` to point to a running Ollama instance.
+2. Create an AI Profile backed by
+   ``openedx_ai_badges.workflows.orchestrators.MITDCCBadgeOrchestrator``
+   (a ready-made profile JSON is included in the plugin).
+
+For a full technical description — including service architecture, the
+difference between the two orchestrators, deployment options, and all
+configuration variables — see
+`docs/references/mit_slm_orchestrator.rst <docs/references/mit_slm_orchestrator.rst>`_.
+
 Architecture Decisions
 ***********************
 
