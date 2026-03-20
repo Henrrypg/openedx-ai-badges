@@ -302,7 +302,18 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
                 headers['Authorization'] = f'Bearer {ollama_token}'
             try:
                 resp = requests.get(tags_url, headers=headers, timeout=5)
-                return 'online' if resp.ok else 'unavailable'
+                if not resp.ok:
+                    return 'unavailable'
+                try:
+                    data = resp.json()
+                except ValueError:
+                    return 'unavailable'
+                models = data.get('models', [])
+                if isinstance(models, list) and len(models) > 0:
+                    return 'online'
+                if isinstance(models, list):
+                    return 'starting'
+                return 'unavailable'
             except Exception:   # pylint: disable=broad-exception-caught
                 return 'unavailable'
 
