@@ -78,8 +78,10 @@ mit-slm:
     MODEL_NAME: "{{ MIT_SLM_MODEL_NAME }}"
     OLLAMA_AUTH_TOKEN: "{{ MIT_SLM_OLLAMA_TOKEN }}"
     OLLAMA_PRELOAD: "{{ MIT_SLM_OLLAMA_PRELOAD }}"
-{% if RUN_MIT_SLM_IMAGE %}    BADGE_IMAGE_SERVICE_URL: "{{ MIT_DCC_BADGE_IMAGE_API_URL }}"
-{% endif %}{% endif %}""",
+{%- if RUN_MIT_SLM_IMAGE %}
+    BADGE_IMAGE_SERVICE_URL: "{{ MIT_DCC_BADGE_IMAGE_API_URL }}"
+{%- endif %}
+{% endif %}""",
         ),
         (
             "k8s-deployments",
@@ -110,9 +112,11 @@ spec:
               value: "{{ MIT_SLM_OLLAMA_TOKEN }}"
             - name: OLLAMA_PRELOAD
               value: "{{ MIT_SLM_OLLAMA_PRELOAD }}"
-{% if RUN_MIT_SLM_IMAGE %}            - name: BADGE_IMAGE_SERVICE_URL
+{%- if RUN_MIT_SLM_IMAGE %}
+            - name: BADGE_IMAGE_SERVICE_URL
               value: "{{ MIT_DCC_BADGE_IMAGE_API_URL }}"
-{% endif %}          ports:
+{%- endif %}
+          ports:
             - containerPort: 8000
 {% endif %}""",
         ),
