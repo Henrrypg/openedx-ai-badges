@@ -93,8 +93,8 @@ const BadgePreview = ({
             {generatedBadge.badgeImage ? (
               <div className="mb-4">
                 <img
-                  src={generatedBadge.badgeImage.base64.startsWith('data:') 
-                    ? generatedBadge.badgeImage.base64 
+                  src={generatedBadge.badgeImage.base64.startsWith('data:')
+                    ? generatedBadge.badgeImage.base64
                     : `data:image/png;base64,${generatedBadge.badgeImage.base64}`}
                   alt="Generated Badge"
                   style={{ maxWidth: '300px', height: 'auto' }}

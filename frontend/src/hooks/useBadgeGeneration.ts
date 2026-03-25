@@ -8,6 +8,7 @@ import {
   BadgeSectionKey,
   BadgeWorkflowAction,
   ProfileConfig,
+  BadgeImageResult,
 } from '../types/badges';
 
 const POLL_INTERVAL_MS = 5000;
@@ -252,7 +253,8 @@ export const useBadgeGeneration = (
         } else if (result.status === 'completed' && result.response) {
           // The result contains {base64, config}
           // We update the local state with the new badge image
-          setGeneratedBadge((prev) => (prev ? { ...prev, badgeImage: result.response } : prev));
+          const badgeImage = result.response as BadgeImageResult;
+          setGeneratedBadge((prev) => (prev ? { ...prev, badgeImage } : prev));
         }
       } catch (error: unknown) {
         setGenerationError(error instanceof Error ? error.message : 'An unexpected error occurred');

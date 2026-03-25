@@ -512,6 +512,6 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
                 "response": badge_image_data,
                 "status": "completed",
             }
-        except Exception as e:
+        except Exception as e:      # pylint: disable=broad-exception-caught
             logger.error("Image generation failed: %s", str(e))
             return {'error': f"Image generation failed: {str(e)}", 'status': 'error'}
