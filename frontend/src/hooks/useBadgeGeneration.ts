@@ -8,6 +8,7 @@ import {
   BadgeSectionKey,
   BadgeWorkflowAction,
   ProfileConfig,
+  BadgeImageResult,
 } from '../types/badges';
 
 const POLL_INTERVAL_MS = 5000;
@@ -29,6 +30,8 @@ interface UseBadgeGenerationReturn {
   generatedBadge: GeneratedBadge | null;
   /** Trigger badge generation with the given form data. */
   handleGenerate: (formData: BadgeFormData, action?: BadgeWorkflowAction) => Promise<void>;
+  /** Trigger image generation with optional visual preferences. */
+  handleGenerateImage: (imageOptions?: unknown) => Promise<void>;
   /** Save an individual section of the generated badge. */
   handleSave: (key: BadgeSectionKey, value: unknown) => Promise<void>;
   /** Locally update a badge section (e.g. from textarea edits). */
@@ -232,6 +235,37 @@ export const useBadgeGeneration = (
     [callWorkflowAsync],
   );
 
+  /** Generate a badge image using the image generation API. */
+  const handleGenerateImage = useCallback(
+    async (imageOptions: unknown = {}) => {
+      setIsGenerating(true);
+      setGenerationError(null);
+      setStatusMessage('Generating badge image...');
+
+      try {
+        const result = await services.callWorkflowService({
+          payload: { action: 'generate_image', userInput: imageOptions },
+          context: contextData,
+        });
+
+        if (result.status === 'error') {
+          setGenerationError(result.error ?? 'Image generation failed');
+        } else if (result.status === 'completed' && result.response) {
+          // The result contains {base64, config}
+          // We update the local state with the new badge image
+          const badgeImage = result.response as BadgeImageResult;
+          setGeneratedBadge((prev) => (prev ? { ...prev, badgeImage } : prev));
+        }
+      } catch (error: unknown) {
+        setGenerationError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      } finally {
+        setStatusMessage(null);
+        setIsGenerating(false);
+      }
+    },
+    [contextData],
+  );
+
   /** Save an individual section back to the backend — stays synchronous. */
   const handleSave = useCallback(
     async (key: BadgeSectionKey, value: unknown) => {
@@ -266,6 +300,7 @@ export const useBadgeGeneration = (
     generationError,
     generatedBadge,
     handleGenerate,
+    handleGenerateImage,
     handleSave,
     updateBadgeSection,
   };

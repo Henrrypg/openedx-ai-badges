@@ -279,6 +279,7 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         health_url = getattr(settings, 'MIT_DCC_BADGE_API_HEALTH_URL', '')
         ollama_url = getattr(settings, 'MIT_SLM_OLLAMA_URL', '')
         ollama_token = getattr(settings, 'MIT_SLM_OLLAMA_TOKEN', '')
+        image_api_health_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_HEALTH_URL', '')
 
         def check_badge_api():
             if not health_url:
@@ -315,17 +316,28 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             except Exception:   # pylint: disable=broad-exception-caught
                 return 'unavailable'
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        def check_image_api():
+            if not image_api_health_url:
+                return 'not_configured'
+            try:
+                resp = requests.get(image_api_health_url, timeout=5)
+                return 'online' if resp.ok else 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                return 'unavailable'
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
             badge_api_future = executor.submit(check_badge_api)
             ollama_future = executor.submit(check_ollama)
+            image_api_future = executor.submit(check_image_api)
             badge_api_status = badge_api_future.result()
             ollama_status = ollama_future.result()
+            image_api_status = image_api_future.result()
 
         return {
             'services': {
                 'badge_api': {'status': badge_api_status, 'required': True},
                 'ollama': {'status': ollama_status, 'required': True},
-                # 'image_api': {'status': 'not_configured', 'required': False},  # planned for future PR
+                'image_api': {'status': image_api_status, 'required': False},
                 # 'laiser_api': {'status': 'not_configured', 'required': False},  # planned for future PR
             }
         }
@@ -429,3 +441,77 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             "response": complete_info,
             "status": "completed",
         }
+
+    def generate_image(self, input_data):
+        """
+        Proxy image generation request to the external MIT DCC Image API.
+
+        Args:
+            input_data: dict containing:
+                - mode: 'icon_based', 'text_overlay', or 'config'
+                - scale_factor: float
+                - (other fields depending on mode)
+        Returns:
+            dict: The API response (base64 + config) and status.
+        """
+        image_api_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_URL', 'http://mit-slm-image:3001')
+        if not image_api_url:
+            return {'error': 'Image API URL not configured', 'status': 'error'}
+
+        mode = input_data.get('mode', 'icon_based')
+        scale_factor = input_data.get('scale_factor', 2.0)
+
+        if mode == 'text_overlay':
+            endpoint = f"{image_api_url}/api/v1/badge/generate-with-text"
+            payload = {
+                "image_type": "text_overlay",
+                "short_title": input_data.get('short_title'),
+                "achievement_phrase": input_data.get('achievement_phrase'),
+                "institution": input_data.get('institution', ''),
+                "institute_url": input_data.get('institute_url', ''),
+                "image_configuration": input_data.get('image_configuration', {}),
+                "scale_factor": scale_factor,
+            }
+        elif mode == 'config':
+            endpoint = f"{image_api_url}/api/v1/badge/generate"
+            payload = {
+                "config": input_data.get('config'),
+                "scale_factor": scale_factor,
+            }
+        else:  # icon_based
+            endpoint = f"{image_api_url}/api/v1/badge/generate-with-icon"
+            payload = {
+                "image_type": "icon_based",
+                "badge_name": input_data.get('badge_name'),
+                "badge_description": input_data.get('badge_description'),
+                "institution": input_data.get('institution', ''),
+                "institute_url": input_data.get('institute_url', ''),
+                "image_configuration": input_data.get('image_configuration', {}),
+                "scale_factor": scale_factor,
+            }
+
+        try:
+            logger.info("Proxying image generation (%s) to: %s", mode, endpoint)
+            response = requests.post(endpoint, json=payload, timeout=60)
+            response.raise_for_status()
+            raw_data = response.json()
+
+            # Normalize for the frontend: ensure we have base64 and config at the top level
+            badge_image_data = {
+                "base64": raw_data.get("data", {}).get("base64", ""),
+                "config": raw_data.get("config", {})
+            }
+
+            # Persist result
+            if 'complete_info' not in self.session.metadata:
+                self.session.metadata['complete_info'] = {}
+            self.session.metadata['complete_info']['badge_image'] = badge_image_data
+            self.session.save(update_fields=['metadata'])
+
+            return {
+                "response": badge_image_data,
+                "status": "completed",
+            }
+        except Exception as e:      # pylint: disable=broad-exception-caught
+            logger.error("Image generation failed: %s", str(e))
+            return {'error': f"Image generation failed: {str(e)}", 'status': 'error'}
