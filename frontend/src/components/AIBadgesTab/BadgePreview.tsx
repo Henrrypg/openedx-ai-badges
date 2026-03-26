@@ -43,11 +43,9 @@ const extractSectionData = (
 ): BadgeData | CourseContext | SkillAlignment[] | undefined => {
   switch (key) {
     case 'achievement':
-      return badge.generatedResponse?.credentialSubject?.achievement
-        ?? (badge as any).achievement;
+      return badge.generatedResponse?.credentialSubject?.achievement;
     case 'skills':
-      return badge.generatedResponse?.skills
-        ?? (badge as any).skills;
+      return badge.generatedResponse?.skills;
     case 'courseContext':
       return badge.courseContext;
     default:
@@ -85,8 +83,7 @@ const BadgePreview = ({
     setEditingSection(null);
   };
 
-  const achievement = generatedBadge.generatedResponse?.credentialSubject?.achievement
-    ?? (generatedBadge as any).achievement;
+  const achievement = generatedBadge.generatedResponse?.credentialSubject?.achievement;
 
   return (
     <Stack>

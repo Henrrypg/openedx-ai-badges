@@ -47,10 +47,21 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             json.dumps(value)
         except Exception as e:      # pylint: disable=broad-exception-caught
             return {'error': f'Value must be valid JSON: {str(e)}', 'status': 'error'}
-        self.session.metadata['complete_info'][key] = value
+        complete_info = self.session.metadata['complete_info']
+        generated_response = complete_info.get('generated_response', {})
+
+        if key == 'achievement':
+            generated_response.setdefault('credentialSubject', {})['achievement'] = value
+            complete_info['generated_response'] = generated_response
+        elif key == 'skills':
+            generated_response['skills'] = value
+            complete_info['generated_response'] = generated_response
+        else:
+            complete_info[key] = value
+
         self.session.save(update_fields=['metadata'])
         return {
-            "response": self.session.metadata['complete_info'],
+            "response": complete_info,
             "status": "saved",
         }
 

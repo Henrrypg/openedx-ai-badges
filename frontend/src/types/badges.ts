@@ -55,15 +55,15 @@ export interface BadgeData {
   [key: string]: unknown;
 }
 
-/** Badge configuration options sent to the API and echoed in the response. */
+/** Badge configuration options echoed in the response (camelCased by the service layer). */
 export interface BadgeConfiguration {
-  badge_style: string;
-  badge_tone: string;
-  badge_level: string;
-  criterion_style: string;
+  badgeStyle: string;
+  badgeTone: string;
+  badgeLevel: string;
+  criterionStyle: string;
   institution?: string;
-  institute_url?: string;
-  custom_instructions?: string;
+  instituteUrl?: string;
+  customInstructions?: string;
 }
 
 /**
