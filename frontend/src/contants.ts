@@ -1,5 +1,7 @@
-import { FormOptionsMap, BadgeFormData } from '../types/badges';
-import messages from '../messages';
+import { FormOptionsMap, BadgeFormData } from './types/badges';
+import messages from './messages';
+
+export const pluginId = 'openedx.frontend.ai.extensions.badges.v1'
 
 export const FORM_OPTIONS: FormOptionsMap = {
   style: [

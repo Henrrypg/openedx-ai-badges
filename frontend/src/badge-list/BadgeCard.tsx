@@ -9,9 +9,10 @@ import messages from './messages';
 interface BadgeCardProps {
   className?: string;
   original: GeneratedBadge;
+  onEdit?: (badge: GeneratedBadge) => void;
 }
 
-const BadgeCard = ({ className, original: badge }: BadgeCardProps) => {
+const BadgeCard = ({ className, original: badge, onEdit }: BadgeCardProps) => {
   const intl = useIntl();
   const isSmall = useMediaQuery({ maxWidth: breakpoints.small.maxWidth });
   const badgeImage = badge.badgeImage;
@@ -46,10 +47,11 @@ const BadgeCard = ({ className, original: badge }: BadgeCardProps) => {
         )}
         <Card.Footer>
           <Button
-            variant="tertiary"
+            variant="secondary"
             iconBefore={Edit}
             disabled={!isDraft}
             className={isDraft ? '' : 'invisible'}
+            onClick={() => onEdit?.(badge)}
           >
             {intl.formatMessage(messages['openedx.ai.badges.card.edit'])}
           </Button>

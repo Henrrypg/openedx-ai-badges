@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import {
   Button, Container, DataTable, CardView, TextFilter, Spinner,
@@ -29,7 +29,7 @@ const CreateBadgeAction = ({ onCreateNew }: { onCreateNew: () => void }) => {
 const GalleryView = ({ contextData, onCreateNew, onEdit }: GalleryViewProps) => {
   const intl = useIntl();
   const { data: badges = [], isLoading } = useListBadges(contextData);
-
+console.debug(badges)
   const columns = useMemo(() => [
     {
       id: 'name',
@@ -37,6 +37,13 @@ const GalleryView = ({ contextData, onCreateNew, onEdit }: GalleryViewProps) => 
       accessor: (row: GeneratedBadge) => row.generatedResponse?.credentialSubject?.achievement?.name ?? '',
     },
   ], [intl]);
+
+  const CardWithEdit = useCallback(
+    (props: { className?: string; original: GeneratedBadge }) => (
+      <BadgeCard {...props} onEdit={onEdit} />
+    ),
+    [onEdit],
+  );
 
   if (isLoading) {
     return (
@@ -65,7 +72,7 @@ const GalleryView = ({ contextData, onCreateNew, onEdit }: GalleryViewProps) => 
       >
         <DataTable.TableControlBar />
         <CardView
-          CardComponent={BadgeCard}
+          CardComponent={CardWithEdit}
         />
         <DataTable.EmptyTable
           content={intl.formatMessage(messages['openedx.ai.badges.gallery.no.results'])}
