@@ -3,9 +3,8 @@ Tests for MITDCCProcessor.
 
 Covers:
 - _build_course_input: field assembly and empty-field handling
-- _parse_api_response: badge extraction paths, skills normalisation,
-  extra-key preservation
-- generate_badge (mock path): output shape matches parsed real-API shape
+- _parse_api_response: canonical pass-through, warnings on missing keys
+- generate_badge (mock path): canonical shape is returned unchanged
 - generate_badge (real API path via mocked requests): happy path and all
   error conditions
 """
@@ -124,68 +123,48 @@ class TestBuildCourseInput:
 # ---------------------------------------------------------------------------
 
 class TestParseApiResponse:
-    """Tests for MITDCCProcessor._parse_api_response."""
+    """Tests for MITDCCProcessor._parse_api_response — canonical pass-through."""
 
-    def test_badge_extracted_from_achievement(self, processor):
+    def test_returns_data_unchanged(self, processor):
         result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
-        assert result["badge"] == REAL_API_RESPONSE["credentialSubject"]["achievement"]
+        assert result == REAL_API_RESPONSE
 
-    def test_badge_falls_back_to_credential_subject_when_no_achievement(self, processor):
-        data = {
-            "credentialSubject": {"name": "Direct Badge"},
-            "badge_id": "abc",
-        }
-        result = processor._parse_api_response(data, skills_enabled=False)
-        assert result["badge"] == {"name": "Direct Badge"}
-
-    def test_badge_falls_back_to_full_response_when_no_credential_subject(self, processor):
-        data = {"name": "Flat Badge", "badge_id": "abc"}
-        result = processor._parse_api_response(data, skills_enabled=False)
-        assert result["badge"] == data
-
-    def test_skills_list_wrapped_in_alignment_envelope(self, processor):
+    def test_credential_subject_preserved(self, processor):
         result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
-        assert "skills" in result
-        assert "alignment" in result["skills"]
-        assert isinstance(result["skills"]["alignment"], list)
-        assert len(result["skills"]["alignment"]) == 1
+        assert result["credentialSubject"] == REAL_API_RESPONSE["credentialSubject"]
+        assert result["credentialSubject"]["achievement"]["name"] == "Intro to Python — Beginner Badge"
 
-    def test_skills_dict_passed_through(self, processor):
-        data = {
-            "credentialSubject": {"achievement": {"name": "B"}},
-            "skills": {"alignment": [{"targetName": "X"}]},
-        }
-        result = processor._parse_api_response(data, skills_enabled=True)
-        assert result["skills"] == {"alignment": [{"targetName": "X"}]}
-
-    def test_skills_stored_even_when_disabled(self, processor):
-        result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=False)
-        assert "skills" in result
-        assert "alignment" in result["skills"]
-
-    def test_skills_absent_when_disabled_and_not_in_response(self, processor):
-        data = {
-            "credentialSubject": {"achievement": {"name": "B"}},
-            "badge_id": "abc",
-        }
-        result = processor._parse_api_response(data, skills_enabled=False)
-        assert "skills" not in result
-
-    def test_extra_keys_namespaced(self, processor):
+    def test_skills_list_preserved(self, processor):
         result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
-        assert "mit_dcc_badge_id" in result
-        assert result["mit_dcc_badge_id"] == REAL_API_RESPONSE["badge_id"]
-        assert "mit_dcc_metrics" in result
-        assert result["mit_dcc_metrics"] == REAL_API_RESPONSE["metrics"]
-        assert "mit_dcc_imageConfig" in result
-        assert "mit_dcc_badge_configuration" in result
-        assert "mit_dcc_enable_image_generation" in result
-        assert "mit_dcc_enable_skill_extraction" in result
+        assert isinstance(result["skills"], list)
+        assert len(result["skills"]) == 1
+        assert result["skills"][0]["targetName"] == "E-Learning"
 
-    def test_credential_subject_not_in_extras(self, processor):
-        result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=False)
-        assert "mit_dcc_credentialSubject" not in result
-        assert "mit_dcc_skills" not in result
+    def test_top_level_metadata_preserved(self, processor):
+        result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
+        assert result["badge_id"] == "17acfd88-56ae-4a18-a427-4d219445b704"
+        assert result["badge_configuration"]["badge_style"] == "modern"
+        assert result["imageConfig"] is None
+
+    def test_warns_on_missing_credential_subject(self, processor):
+        data = {"badge_id": "abc"}
+        with patch('openedx_ai_badges.processors.mit_dcc_processor.logger') as mock_logger:
+            processor._parse_api_response(data, skills_enabled=False)
+            mock_logger.warning.assert_called()
+
+    def test_warns_on_missing_skills_when_enabled(self, processor):
+        data = {"credentialSubject": {"achievement": {"name": "B"}}}
+        with patch('openedx_ai_badges.processors.mit_dcc_processor.logger') as mock_logger:
+            processor._parse_api_response(data, skills_enabled=True)
+            warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+            assert any("skills" in w for w in warning_calls)
+
+    def test_no_warning_when_skills_disabled_and_absent(self, processor):
+        data = {"credentialSubject": {"achievement": {"name": "B"}}}
+        with patch('openedx_ai_badges.processors.mit_dcc_processor.logger') as mock_logger:
+            processor._parse_api_response(data, skills_enabled=False)
+            warning_calls = [str(c) for c in mock_logger.warning.call_args_list]
+            assert not any("skills" in w for w in warning_calls)
 
 
 # ---------------------------------------------------------------------------
@@ -193,42 +172,49 @@ class TestParseApiResponse:
 # ---------------------------------------------------------------------------
 
 class TestGenerateBadgeMock:
-    """Tests for MITDCCProcessor._mock_api_response."""
+    """Tests for MITDCCProcessor._mock_api_response — canonical shape."""
 
-    def test_returns_badge_key(self, processor):
+    def test_returns_credential_subject(self, processor):
         result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
-        assert "badge" in result
-        assert result["badge"]["name"] == "Intro to Python — Beginner Badge"
+        assert "credentialSubject" in result
+        assert "achievement" in result["credentialSubject"]
 
-    def test_returns_skills_when_enabled(self, processor):
+    def test_achievement_contains_required_fields(self, processor):
+        result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
+        achievement = result["credentialSubject"]["achievement"]
+        assert "name" in achievement
+        assert "description" in achievement
+        assert "criteria" in achievement
+        assert "narrative" in achievement["criteria"]
+
+    def test_returns_skills_list(self, processor):
         result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_WITH_SKILLS)
         assert "skills" in result
-        assert "alignment" in result["skills"]
-        assert len(result["skills"]["alignment"]) > 0
+        assert isinstance(result["skills"], list)
+        assert len(result["skills"]) > 0
 
-    def test_skills_stored_even_when_disabled(self, processor):
-        # mock always includes skills in raw payload, even when disabled
+    def test_badge_configuration_present(self, processor):
         result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
-        assert "skills" in result
+        assert "badge_configuration" in result
+        assert result["badge_configuration"]["badge_style"] == "modern"
 
-    def test_extra_mit_dcc_keys_present(self, processor):
+    def test_metadata_fields_present(self, processor):
         result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
-        assert "mit_dcc_badge_id" in result
-        assert "mit_dcc_metrics" in result
-        assert "mit_dcc_badge_configuration" in result
+        assert "badge_id" in result
+        assert "metrics" in result
+        assert "imageConfig" in result
 
-    def test_mock_and_real_produce_same_top_level_shape(self, processor):
+    def test_mock_and_real_produce_same_top_level_keys(self, processor):
         mock_result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_WITH_SKILLS)
-        real_result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
-        assert set(mock_result.keys()) == set(real_result.keys())
+        assert set(mock_result.keys()) == set(REAL_API_RESPONSE.keys())
 
-    def test_badge_contains_name_description_criteria(self, processor):
+    def test_no_legacy_badge_key(self, processor):
         result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
-        badge = result["badge"]
-        assert "name" in badge
-        assert "description" in badge
-        assert "criteria" in badge
-        assert "narrative" in badge["criteria"]
+        assert "badge" not in result
+
+    def test_no_mit_dcc_namespaced_keys(self, processor):
+        result = processor._mock_api_response(COURSE_CONTEXT, INPUT_DATA_NO_SKILLS)
+        assert not any(k.startswith("mit_dcc_") for k in result)
 
 
 # ---------------------------------------------------------------------------
@@ -249,13 +235,20 @@ class TestGenerateBadgeCallApi:
         return mock_resp
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
-    def test_happy_path_returns_normalised_result(self, mock_post, processor):
+    def test_happy_path_returns_canonical_result(self, mock_post, processor):
         mock_post.return_value = self._make_mock_response(REAL_API_RESPONSE)
         result = processor._call_api(COURSE_CONTEXT, INPUT_DATA_WITH_SKILLS)
-        assert "badge" in result
+        assert "credentialSubject" in result
         assert "skills" in result
-        assert "mit_dcc_badge_id" in result
-        assert result["mit_dcc_badge_id"] == "17acfd88-56ae-4a18-a427-4d219445b704"
+        assert "badge_id" in result
+        assert result["badge_id"] == "17acfd88-56ae-4a18-a427-4d219445b704"
+
+    @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
+    def test_no_legacy_keys_in_result(self, mock_post, processor):
+        mock_post.return_value = self._make_mock_response(REAL_API_RESPONSE)
+        result = processor._call_api(COURSE_CONTEXT, INPUT_DATA_WITH_SKILLS)
+        assert "badge" not in result
+        assert not any(k.startswith("mit_dcc_") for k in result)
 
     @patch("openedx_ai_badges.processors.mit_dcc_processor.requests.post")
     def test_correct_payload_sent(self, mock_post, processor):

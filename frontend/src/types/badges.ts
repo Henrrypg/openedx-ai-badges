@@ -24,8 +24,8 @@ export interface BadgeFormData {
   skillsEnabled: boolean;
 }
 
-/** Keys that can appear in the generated badge response. */
-export type BadgeSectionKey = 'courseContext' | 'skills' | 'badge';
+/** Keys that identify editable sections of the generated badge response. */
+export type BadgeSectionKey = 'achievement' | 'skills' | 'courseContext';
 
 /** Detailed information for each generated section. */
 
@@ -44,10 +44,6 @@ export interface SkillAlignment {
   targetUrl: string;
 }
 
-export interface SkillsData {
-  alignment: SkillAlignment[];
-}
-
 export interface BadgeCriteria {
   narrative: string;
 }
@@ -59,17 +55,50 @@ export interface BadgeData {
   [key: string]: unknown;
 }
 
+/** Badge configuration options echoed in the response (camelCased by the service layer). */
+export interface BadgeConfiguration {
+  badgeStyle: string;
+  badgeTone: string;
+  badgeLevel: string;
+  criterionStyle: string;
+  institution?: string;
+  instituteUrl?: string;
+  customInstructions?: string;
+}
+
+/**
+ * The canonical generated response shape shared by both orchestrators.
+ * Keys are camelCase because the service layer applies camelCaseObject to all API responses.
+ */
+export interface GeneratedResponse {
+  credentialSubject?: {
+    achievement?: BadgeData;
+  };
+  skills?: SkillAlignment[];
+  badgeConfiguration?: BadgeConfiguration;
+  enableSkillExtraction?: boolean;
+  /** MIT DCC only — present when generation was performed via the MIT API. */
+  badgeId?: string;
+  metrics?: Record<string, unknown>;
+  imageConfig?: unknown;
+  enableImageGeneration?: boolean;
+}
+
 /** Result from the badge image generation API. */
 export interface BadgeImageResult {
   base64: string;
   config: Record<string, unknown>;
 }
 
-/** Shape of the AI-generated badge response. */
+/**
+ * Shape of the AI-generated badge response as seen by the frontend.
+ * The service layer applies camelCaseObject to the raw API response, so
+ * snake_case backend keys (course_context, generated_response) arrive as
+ * courseContext and generatedResponse.
+ */
 export interface GeneratedBadge {
   courseContext?: CourseContext;
-  skills?: SkillsData;
-  badge?: BadgeData;
+  generatedResponse?: GeneratedResponse;
   badgeImage?: BadgeImageResult;
   [key: string]: unknown;
 }

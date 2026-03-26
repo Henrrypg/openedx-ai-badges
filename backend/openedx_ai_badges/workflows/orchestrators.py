@@ -47,10 +47,21 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             json.dumps(value)
         except Exception as e:      # pylint: disable=broad-exception-caught
             return {'error': f'Value must be valid JSON: {str(e)}', 'status': 'error'}
-        self.session.metadata['complete_info'][key] = value
+        complete_info = self.session.metadata['complete_info']
+        generated_response = complete_info.get('generated_response', {})
+
+        if key == 'achievement':
+            generated_response.setdefault('credentialSubject', {})['achievement'] = value
+            complete_info['generated_response'] = generated_response
+        elif key == 'skills':
+            generated_response['skills'] = value
+            complete_info['generated_response'] = generated_response
+        else:
+            complete_info[key] = value
+
         self.session.save(update_fields=['metadata'])
         return {
-            "response": self.session.metadata['complete_info'],
+            "response": complete_info,
             "status": "saved",
         }
 
@@ -68,23 +79,24 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 "status": "error",
             }
 
-        complete_info = self.session.metadata['complete_info']
+        previous_complete_info = self.session.metadata['complete_info']
+        previous_generated_response = previous_complete_info.get('generated_response', {})
 
-        if not complete_info.get('badge'):
+        if not previous_generated_response.get('credentialSubject'):
             return {
                 "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
                 "status": "error",
             }
 
         skills_requested = input_data.get('skills_enabled', False) or input_data.get('skillsEnabled', False)
-        if skills_requested and not complete_info.get('skills'):
+        if skills_requested and not previous_generated_response.get('skills'):
             return {
                 "error": "Skills were requested for regeneration but no previous skills definition was found.",
                 "status": "error",
             }
 
-        input_data['previous_badge'] = complete_info.get('badge')
-        input_data['previous_skills'] = complete_info.get('skills')
+        input_data['previous_badge'] = previous_generated_response.get('credentialSubject', {}).get('achievement', {})
+        input_data['previous_skills'] = previous_generated_response.get('skills', [])
 
         self._set_status_message("Fetching course content...")
         course_context = self._get_course_context()
@@ -93,19 +105,31 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
 
         complete_info = {}
         complete_info['course_context'] = course_context
+
+        generated_response = {
+            'enable_skill_extraction': skills_requested,
+            'badge_configuration': {
+                'badge_style': input_data.get('style', ''),
+                'badge_tone': input_data.get('tone', ''),
+                'badge_level': input_data.get('level', ''),
+                'criterion_style': input_data.get('criterion', ''),
+            },
+        }
+
         if skills_requested:
             self._set_status_message("Generating skills alignment...")
             skills = self._get_skills(course_context, input_data, regenerate=True)
             if isinstance(skills, dict) and 'error' in skills:
                 return skills
-            complete_info['skills'] = skills
+            generated_response['skills'] = skills
 
         self._set_status_message("Generating badge definition...")
-        badge = self._get_badge(complete_info, input_data, regenerate=True)
-        if isinstance(badge, dict) and 'error' in badge:
-            return badge
-        complete_info['badge'] = badge
+        credential_subject = self._get_achievement(complete_info, input_data, regenerate=True)
+        if isinstance(credential_subject, dict) and 'error' in credential_subject:
+            return credential_subject
+        generated_response['credentialSubject'] = credential_subject
 
+        complete_info['generated_response'] = generated_response
         self.session.metadata['complete_info'] = complete_info
         self.session.save(update_fields=['metadata'])
 
@@ -166,19 +190,32 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
 
         complete_info = {}
         complete_info['course_context'] = course_context
-        if input_data.get('skills_enabled', False) or input_data.get('skillsEnabled', False):
+
+        skills_enabled = input_data.get('skills_enabled', False) or input_data.get('skillsEnabled', False)
+        generated_response = {
+            'enable_skill_extraction': skills_enabled,
+            'badge_configuration': {
+                'badge_style': input_data.get('style', ''),
+                'badge_tone': input_data.get('tone', ''),
+                'badge_level': input_data.get('level', ''),
+                'criterion_style': input_data.get('criterion', ''),
+            },
+        }
+
+        if skills_enabled:
             self._set_status_message("Generating skills alignment...")
             skills = self._get_skills(course_context, input_data)
             if isinstance(skills, dict) and 'error' in skills:
                 return skills
-            complete_info['skills'] = skills
+            generated_response['skills'] = skills
 
         self._set_status_message("Generating badge definition...")
-        badge = self._get_badge(complete_info, input_data)
-        if isinstance(badge, dict) and 'error' in badge:
-            return badge
-        complete_info['badge'] = badge
+        credential_subject = self._get_achievement(complete_info, input_data)
+        if isinstance(credential_subject, dict) and 'error' in credential_subject:
+            return credential_subject
+        generated_response['credentialSubject'] = credential_subject
 
+        complete_info['generated_response'] = generated_response
         self.session.metadata['complete_info'] = complete_info
         self.session.save(update_fields=['metadata'])
 
@@ -201,7 +238,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         return course_context
 
     def _get_skills(self, course_context, input_data, regenerate=False):
-        """Run SkillsProcessor and return skills or error dict."""
+        """Run SkillsProcessor and return the skills list or an error dict."""
         skill_processor = SkillsProcessor(
             self.profile.processor_config,
             regenerate=regenerate
@@ -216,16 +253,16 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 'status': 'error'
             }
         try:
-            skills = json.loads(llm_result.get("response", "{}"))
-            return skills
+            result = json.loads(llm_result.get("response", "{}"))
+            return result.get('skills', [])
         except json.JSONDecodeError as e:
             return {
                 'error': f"Failed to parse skills response: {str(e)}",
                 'status': 'error'
             }
 
-    def _get_badge(self, complete_info, input_data, regenerate=False):
-        """Run BadgeProcessor and return badge dict."""
+    def _get_achievement(self, complete_info, input_data, regenerate=False):
+        """Run BadgeProcessor and return the credentialSubject dict or an error dict."""
         badge_processor = BadgeProcessor(
             self.profile.processor_config,
             regenerate=regenerate
@@ -234,17 +271,14 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             context=json.dumps(complete_info),
             input_data=json.dumps(input_data)
         )
-
         if 'error' in llm_result:
             return {
                 'error': f"Badge generation failed: {llm_result.get('error', 'Unknown error')}",
                 'status': 'error'
             }
         try:
-            badge = json.loads(llm_result.get("response", "{}"))
-            if complete_info.get('skills'):
-                badge = {**badge, **complete_info['skills']}
-            return badge
+            result = json.loads(llm_result.get("response", "{}"))
+            return result.get('credentialSubject', {})
         except json.JSONDecodeError as e:
             return {
                 'error': f"Failed to parse badge response: {str(e)}",
@@ -375,7 +409,7 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
 
         complete_info = {
             'course_context': course_context,
-            **api_result,
+            'generated_response': api_result,
         }
 
         self.session.metadata['complete_info'] = complete_info
@@ -403,8 +437,9 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             }
 
         previous_complete_info = self.session.metadata['complete_info']
+        previous_generated_response = previous_complete_info.get('generated_response', {})
 
-        if not previous_complete_info.get('badge'):
+        if not previous_generated_response.get('credentialSubject'):
             return {
                 "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
                 "status": "error",
@@ -421,8 +456,8 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             course_context=course_context,
             input_data={
                 **input_data,
-                'previous_badge': previous_complete_info.get('badge'),
-                'previous_skills': previous_complete_info.get('skills'),
+                'previous_badge': previous_generated_response.get('credentialSubject', {}).get('achievement', {}),
+                'previous_skills': previous_generated_response.get('skills', []),
             },
         )
 
@@ -431,7 +466,7 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
 
         complete_info = {
             'course_context': course_context,
-            **api_result,
+            'generated_response': api_result,
         }
 
         self.session.metadata['complete_info'] = complete_info

@@ -1,21 +1,21 @@
 {
   "type": "json_schema",
   "json_schema": {
-    "name": "OpenBadgeSkillsAlignment",
+    "name": "BadgeSkillsAlignment",
     "strict": true,
     "schema": {
       "type": "object",
       "properties": {
-        "alignment": {
+        "skills": {
           "type": "array",
-          "description": "A list of skills or standards aligned with this achievement.",
+          "description": "A list of skills aligned with this achievement.",
           "items": {
             "type": "object",
             "properties": {
               "type": {
                 "type": "string",
                 "const": "Alignment",
-                "description": "Must always be 'Alignment' for OBv3."
+                "description": "Must always be 'Alignment'."
               },
               "targetType": {
                 "type": "string",
@@ -46,7 +46,7 @@
         }
       },
       "required": [
-        "alignment"
+        "skills"
       ],
       "additionalProperties": false
     }

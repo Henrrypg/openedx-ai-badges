@@ -77,10 +77,11 @@ const AIBadgesTab = ({ uiSlotSelectorId, courseId, locationId }: AIBadgesTabProp
   const onGenerateImageClick = async ({ badgeName, badgeDescription }: {
     badgeName: string, badgeDescription: string
   }) => {
+    const achievement = generatedBadge?.generatedResponse?.credentialSubject?.achievement;
     await handleGenerateImage({
       mode: 'icon_based',
-      badge_name: badgeName,
-      badge_description: badgeDescription,
+      badge_name: badgeName || achievement?.name || '',
+      badge_description: badgeDescription || achievement?.description || '',
     });
   };
 
