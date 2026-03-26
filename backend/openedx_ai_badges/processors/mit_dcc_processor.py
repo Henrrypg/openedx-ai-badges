@@ -135,8 +135,8 @@ class MITDCCProcessor:
         logger.debug("MIT DCC API full parsed response: %s", data)
 
         result = self._parse_api_response(data, skills_enabled)
-        logger.info("MIT DCC normalised result keys: %s", list(result.keys()))
-        logger.debug("MIT DCC normalised result: %s", result)
+        logger.info("MIT DCC result keys: %s", list(result.keys()))
+        logger.debug("MIT DCC result: %s", result)
         return result
 
     # ------------------------------------------------------------------
@@ -229,7 +229,7 @@ class MITDCCProcessor:
         logger.debug("MIT DCC mock raw response: %s", raw)
 
         result = self._parse_api_response(raw, skills_enabled)
-        logger.info("MIT DCC mock normalised result keys: %s", list(result.keys()))
+        logger.info("MIT DCC mock result keys: %s", list(result.keys()))
         return result
 
     # ------------------------------------------------------------------
@@ -251,80 +251,27 @@ class MITDCCProcessor:
 
     def _parse_api_response(self, data: dict, skills_enabled: bool) -> dict:
         """
-        Normalise the MIT DCC API response into the internal format.
+        Validate and pass through the MIT DCC API response.
 
-        Mapping:
-        - ``badge``   ← ``credentialSubject.achievement`` (with fallbacks)
-        - ``skills``  ← ``skills`` wrapped in ``{"alignment": [...]}`` if list
-        - ``mit_dcc_<key>`` ← every other top-level key, preserved as-is
+        The canonical shape is returned as-is.  Warnings are logged when
+        expected keys are missing so that callers can detect degraded responses
+        without the normalisation layer masking the problem.
         """
-        result = {}
-
-        # --- badge ----------------------------------------------------------
-        credential_subject = data.get("credentialSubject")
-        if credential_subject is None:
+        if "credentialSubject" not in data:
             logger.warning(
-                "MIT DCC response missing 'credentialSubject' — storing full response as badge. "
-                "Top-level keys: %s",
+                "MIT DCC response missing 'credentialSubject' — top-level keys: %s",
                 list(data.keys()),
             )
-            result["badge"] = data
-        elif "achievement" in credential_subject:
-            logger.info(
-                "MIT DCC credentialSubject contains 'achievement' — using credentialSubject.achievement as badge. "
-                "credentialSubject keys: %s",
-                list(credential_subject.keys()),
+        elif "achievement" not in data.get("credentialSubject", {}):
+            logger.warning(
+                "MIT DCC credentialSubject missing 'achievement' — credentialSubject keys: %s",
+                list(data["credentialSubject"].keys()),
             )
-            result["badge"] = credential_subject["achievement"]
-        else:
-            logger.info(
-                "MIT DCC credentialSubject has no 'achievement' key — using credentialSubject as badge. "
-                "credentialSubject keys: %s",
-                list(credential_subject.keys()),
+
+        if skills_enabled and "skills" not in data:
+            logger.warning(
+                "MIT DCC response missing 'skills' despite enable_skill_extraction=True"
             )
-            result["badge"] = credential_subject
 
-        logger.debug("Parsed badge: %s", result["badge"])
-
-        # --- skills ---------------------------------------------------------
-        skills_raw = data.get("skills")
-        if skills_enabled:
-            if skills_raw is None:
-                logger.warning(
-                    "MIT DCC response has no 'skills' key despite enable_skill_extraction=True"
-                )
-            else:
-                if isinstance(skills_raw, list):
-                    logger.info(
-                        "MIT DCC skills returned as list (%d items) — wrapping in alignment envelope",
-                        len(skills_raw),
-                    )
-                    result["skills"] = {"alignment": skills_raw}
-                else:
-                    logger.info(
-                        "MIT DCC skills returned as %s with keys: %s",
-                        type(skills_raw).__name__,
-                        list(skills_raw.keys()) if isinstance(skills_raw, dict) else "n/a",
-                    )
-                    result["skills"] = skills_raw
-                logger.debug("Parsed skills: %s", result.get("skills"))
-        else:
-            if skills_raw is not None:
-                logger.info(
-                    "MIT DCC response included 'skills' even though extraction was disabled — storing anyway"
-                )
-                result["skills"] = (
-                    {"alignment": skills_raw} if isinstance(skills_raw, list) else skills_raw
-                )
-
-        # --- preserve all remaining API keys --------------------------------
-        handled = {"credentialSubject", "skills"}
-        extras = {k: v for k, v in data.items() if k not in handled}
-        if extras:
-            logger.info("MIT DCC preserving extra response keys: %s", list(extras.keys()))
-            for key, value in extras.items():
-                namespaced = f"mit_dcc_{key}"
-                result[namespaced] = value
-                logger.debug("Stored %s: %s", namespaced, value)
-
-        return result
+        logger.debug("MIT DCC pass-through response: %s", data)
+        return data
