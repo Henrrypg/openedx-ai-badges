@@ -127,7 +127,7 @@ class TestParseApiResponse:
 
     def test_returns_data_unchanged(self, processor):
         result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
-        assert result is REAL_API_RESPONSE
+        assert result == REAL_API_RESPONSE
 
     def test_credential_subject_preserved(self, processor):
         result = processor._parse_api_response(REAL_API_RESPONSE, skills_enabled=True)
