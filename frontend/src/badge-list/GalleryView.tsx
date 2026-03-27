@@ -1,9 +1,11 @@
-import { useCallback, useMemo } from 'react';
+import {
+  useCallback, useMemo, useState, useEffect,
+} from 'react';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import {
-  Button, Container, DataTable, CardView, TextFilter, Spinner,
+  Alert, Button, Container, DataTable, CardView, TextFilter, Spinner,
 } from '@openedx/paragon';
-import { Add } from '@openedx/paragon/icons';
+import { Add, InfoOutline } from '@openedx/paragon/icons';
 import { services } from '@openedx/openedx-ai-extensions-ui';
 import { useListBadges } from './data/apiHooks';
 import EmptyStateView from './EmptyStateView';
@@ -33,7 +35,15 @@ const GalleryView = ({
   contextData, onCreateNew, onEdit, customMessage,
 }: GalleryViewProps) => {
   const intl = useIntl();
-  const { data: badges = [], isLoading } = useListBadges(contextData);
+  const { data: badges = [], isLoading, error } = useListBadges(contextData);
+  const [listError, setListError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      const label = intl.formatMessage(messages['openedx.ai.badges.gallery.error.load']);
+      setListError(`${label} ${error}`);
+    }
+  }, [error, intl]);
   const columns = useMemo(() => [
     {
       id: 'name',
@@ -49,6 +59,18 @@ const GalleryView = ({
     [onEdit],
   );
 
+  const errorAlert = listError && (
+    <Alert
+      variant="danger"
+      dismissible
+      icon={InfoOutline}
+      onClose={() => setListError(null)}
+      className="mb-3"
+    >
+      {listError}
+    </Alert>
+  );
+
   if (isLoading) {
     return (
       <Container className="d-flex justify-content-center align-items-center py-5">
@@ -58,11 +80,17 @@ const GalleryView = ({
   }
 
   if (badges.length === 0) {
-    return <EmptyStateView onCreateNew={onCreateNew} customMessage={customMessage} />;
+    return (
+      <Container className="py-4">
+        {errorAlert}
+        <EmptyStateView onCreateNew={onCreateNew} customMessage={customMessage} />
+      </Container>
+    );
   }
 
   return (
     <Container className="py-4">
+      {errorAlert}
       <p>
         {intl.formatMessage(messages['openedx-ai-badges.tab.description'], { bold: Bold })}
       </p>

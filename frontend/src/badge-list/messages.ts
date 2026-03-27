@@ -56,6 +56,11 @@ const messages = defineMessages({
     defaultMessage: 'Edit',
     description: 'Button to edit a draft badge',
   },
+  'openedx.ai.badges.gallery.error.load': {
+    id: 'openedx.ai.badges.gallery.error.load',
+    defaultMessage: 'Failed to load badges.',
+    description: 'Error alert shown when the badge list query fails',
+  },
 });
 
 export default messages;

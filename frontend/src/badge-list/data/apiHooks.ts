@@ -11,7 +11,14 @@ export const queryKey = {
 
 export const useListBadges = (
   contextData: ReturnType<typeof services.prepareContextData>,
-) => useQuery<GeneratedBadge[]>({
-  queryKey: queryKey.list(contextData),
-  queryFn: () => getBadges(contextData),
-});
+) => {
+  const query = useQuery<GeneratedBadge[]>({
+    queryKey: queryKey.list(contextData),
+    queryFn: () => getBadges(contextData),
+  });
+  return {
+    data: query.data,
+    isLoading: query.isLoading,
+    error: query.error instanceof Error ? query.error.message : null,
+  };
+};
