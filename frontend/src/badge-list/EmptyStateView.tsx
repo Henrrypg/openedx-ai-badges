@@ -3,6 +3,10 @@ import { Button, Container, Icon } from '@openedx/paragon';
 import { WorkspacePremium } from '@openedx/paragon/icons';
 import messages from './messages';
 
+/** Renders bold text for internationalized messages. */
+const Bold = (chunks: React.ReactNode) => <strong>{chunks}</strong>;
+const Br = () => <br />;
+
 interface EmptyStateViewProps {
   onCreateNew: () => void;
 }
@@ -23,7 +27,7 @@ const EmptyStateView = ({ onCreateNew }: EmptyStateViewProps) => {
         {intl.formatMessage(messages['openedx.ai.badges.empty.state.headline'])}
       </h2>
       <p className="text-muted text-center mb-5">
-        {intl.formatMessage(messages['openedx.ai.badges.empty.state.subtext'])}
+        {intl.formatMessage(messages['openedx-ai-badges.tab.description'], { bold: Bold, br: Br })}
       </p>
       <Button variant="primary" onClick={onCreateNew}>
         {intl.formatMessage(messages['openedx.ai.badges.button.create'])}

@@ -1,7 +1,7 @@
 import { useIntl } from '@edx/frontend-platform/i18n';
 import { Form, StatefulButton } from '@openedx/paragon';
 import { BadgeFormData, SelectableFieldKey, BadgeWorkflowAction } from '../../types/badges';
-import { FORM_OPTIONS } from '../../constants/formOptions';
+import { FORM_OPTIONS } from '../../contants';
 import SelectableBoxGroup from './SelectableBoxGroup';
 import messages from '../../messages';
 

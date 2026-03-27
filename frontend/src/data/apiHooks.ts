@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { services } from '@openedx/openedx-ai-extensions-ui';
 import { ProfileConfig } from '../types/badges';
-import { fetchProfileConfig } from './api';
+import { getProfileConfig } from './api';
 import { pluginId } from '../contants';
 
 const queryKey = {
@@ -13,5 +13,5 @@ export const useProfileConfig = (
   contextData: ReturnType<typeof services.prepareContextData>,
 ) => useQuery<ProfileConfig | null>({
   queryKey: queryKey.config(contextData),
-  queryFn: () => fetchProfileConfig(contextData),
+  queryFn: () => getProfileConfig(contextData),
 });

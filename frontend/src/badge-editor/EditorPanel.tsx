@@ -1,18 +1,49 @@
-import { EditorFormData } from '../types/badges';
+import { services } from '@openedx/openedx-ai-extensions-ui';
+import { GeneratedBadge } from '../types/badges';
+import CreateForm from './components/CreateForm';
+import EditForm from './components/EditForm';
 
-interface EditorPanelProps {
-  editorData: EditorFormData;
-  onChange: (data: EditorFormData) => void;
-  onRegenerate: () => void;
-  isRegenerating: boolean;
-  isOutOfSync: boolean;
-  disabled?: boolean;
+interface CreatePanelProps {
+  mode: 'create';
+  contextData: ReturnType<typeof services.prepareContextData>;
+  onBadgeGenerated: (badge: GeneratedBadge) => void;
+  isServicesReady?: boolean;
 }
 
-const EditorPanel = ({
-  editorData, onChange, onRegenerate, isRegenerating, isOutOfSync, disabled,
-}: EditorPanelProps) => (
-  <div>EditorPanel (stub)</div>
-);
+interface EditPanelProps {
+  mode: 'edit';
+  badge: GeneratedBadge;
+  contextData: ReturnType<typeof services.prepareContextData>;
+  onBadgeChange: (badge: GeneratedBadge) => void;
+  onRegenerate: () => void;
+  isGenerating: boolean;
+  statusMessage?: string | null;
+}
+
+type EditorPanelProps = CreatePanelProps | EditPanelProps;
+
+const EditorPanel = (props: EditorPanelProps) => {
+  if (props.mode === 'create') {
+    return (
+      <CreateForm
+        contextData={props.contextData}
+        onBadgeGenerated={props.onBadgeGenerated}
+        isServicesReady={props.isServicesReady}
+      />
+    );
+  }
+
+  return (
+    <EditForm
+      badge={props.badge}
+      contextData={props.contextData}
+      onChange={props.onBadgeChange}
+      onRegenerate={props.onRegenerate}
+      isRegenerating={props.isGenerating}
+      statusMessage={props.statusMessage}
+      disabled={props.isGenerating}
+    />
+  );
+};
 
 export default EditorPanel;

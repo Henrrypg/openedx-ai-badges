@@ -1,5 +1,11 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Container, Row, Col } from '@openedx/paragon';
 import { services } from '@openedx/openedx-ai-extensions-ui';
-import { GeneratedBadge } from '../types/badges';
+import { GeneratedBadge, BadgeImageResult, BadgeStatus } from '../types/badges';
+import { useBadgeGenerate, useBadgeSave } from './data/apiHooks';
+import EditorViewHeader from './components/EditorViewHeader';
+import EditorPanel from './EditorPanel';
+import PreviewPanel from './PreviewPanel';
 
 export interface EditorViewProps {
   contextData: ReturnType<typeof services.prepareContextData>;
@@ -11,10 +17,96 @@ export interface EditorViewProps {
 const EditorView = ({
   badge, contextData, onBack, onSaveComplete,
 }: EditorViewProps) => {
-  const mode = badge ? 'edit' : 'create';
+  const isNewBadge = !badge;
+  const [editedBadge, setEditedBadge] = useState<GeneratedBadge | null>(null);
+  const [lastGeneratedImage, setLastGeneratedImage] = useState<BadgeImageResult | null>(null);
+
+  // Only used in edit mode for regeneration
+  const { generate, isGenerating, statusMessage, generatedBadge } = useBadgeGenerate(contextData);
+  const { save, remove } = useBadgeSave(contextData);
+
+  // When regeneration produces a new badge, update editedBadge (ref-guarded against stale cache)
+  const prevGeneratedBadge = useRef<GeneratedBadge | null>(generatedBadge);
+  useEffect(() => {
+    if (generatedBadge && generatedBadge !== prevGeneratedBadge.current) {
+      prevGeneratedBadge.current = generatedBadge;
+      setEditedBadge(generatedBadge);
+    }
+  }, [generatedBadge]);
+
+  const currentBadge = editedBadge ?? badge ?? null;
+  const showEditForm = !!currentBadge;
+  const badgeTitle = currentBadge?.generatedResponse?.credentialSubject?.achievement?.name ?? '';
+
+  const handleBadgeGenerated = useCallback((generated: GeneratedBadge) => {
+    setEditedBadge(generated);
+  }, []);
+
+  const handleRegenerate = useCallback(() => {
+    setEditedBadge(null);
+    generate({ formData: {} as any, action: 'regenerate' });
+  }, [generate]);
+
+  const handleBadgeChange = useCallback((updated: GeneratedBadge) => {
+    setEditedBadge(updated);
+  }, []);
+
+  const handleSave = (status: BadgeStatus) => {
+    if (!currentBadge) return;
+    const badgeToSave = lastGeneratedImage
+      ? { ...currentBadge, badgeImage: lastGeneratedImage }
+      : currentBadge;
+    save.mutate({ badge: badgeToSave, status }, { onSuccess: onSaveComplete });
+  };
+
+  const handleDeleteDraft = () => {
+    const badgeId = currentBadge?.id as string | undefined;
+    if (!badgeId) return;
+    remove.mutate(badgeId, { onSuccess: onSaveComplete });
+  };
 
   return (
-    <div>EditorView (stub) — mode: {mode}</div>
+    <Container fluid className="py-3">
+      <EditorViewHeader
+        badgeTitle={badgeTitle}
+        isNewBadge={isNewBadge}
+        hasUnsavedChanges={!!editedBadge || !!lastGeneratedImage}
+        isSaving={save.isLoading || remove.isLoading}
+        onBack={onBack}
+        onDeleteDraft={handleDeleteDraft}
+        onSaveDraft={() => handleSave('draft')}
+        onSavePublish={() => handleSave('published')}
+      />
+      <Row className="mt-4">
+        <Col lg={4}>
+          <PreviewPanel
+            contextData={contextData}
+            badge={currentBadge}
+            versions={currentBadge?.versions}
+            onImageGenerated={setLastGeneratedImage}
+          />
+        </Col>
+        <Col lg={8}>
+          {showEditForm ? (
+            <EditorPanel
+              mode="edit"
+              badge={currentBadge}
+              contextData={contextData}
+              onBadgeChange={handleBadgeChange}
+              onRegenerate={handleRegenerate}
+              isGenerating={isGenerating}
+              statusMessage={statusMessage}
+            />
+          ) : (
+            <EditorPanel
+              mode="create"
+              contextData={contextData}
+              onBadgeGenerated={handleBadgeGenerated}
+            />
+          )}
+        </Col>
+      </Row>
+    </Container>
   );
 };
 

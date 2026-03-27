@@ -3,7 +3,7 @@ import {
   ActionRow, Button,
 } from '@openedx/paragon';
 import { ArrowBack, DeleteOutline } from '@openedx/paragon/icons';
-import messages from './messages';
+import messages from '../messages';
 
 interface EditorViewHeaderProps {
   badgeTitle: string;

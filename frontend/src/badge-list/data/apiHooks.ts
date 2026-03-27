@@ -12,6 +12,6 @@ const queryKey =  {
 export const useListBadges = (
   contextData: ReturnType<typeof services.prepareContextData>,
 ) => useQuery<GeneratedBadge[]>({
-  queryKey: [queryKey.list(contextData)],
+  queryKey: queryKey.list(contextData),
   queryFn: () => getBadges(contextData),
 });

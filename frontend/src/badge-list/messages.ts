@@ -1,15 +1,15 @@
 import { defineMessages } from '@edx/frontend-platform/i18n';
 
 const messages = defineMessages({
+  'openedx-ai-badges.tab.description': {
+    id: 'openedx-ai-badges.tab.description',
+    defaultMessage: 'This tab allows you to generate <bold>Open Badges 3.0</bold> following the official standard. The system automatically extracts real information from your course, including the title, description, and overview by default. <br></br> The extraction process and the final output are highly configurable via the <bold>AI Workflow Profile</bold>.',
+    description: 'First paragraph of the badge generator description',
+  },
   'openedx.ai.badges.empty.state.headline': {
     id: 'openedx.ai.badges.empty.state.headline',
     defaultMessage: 'Create your first badge',
     description: 'Headline shown when no badges exist yet',
-  },
-  'openedx.ai.badges.empty.state.subtext': {
-    id: 'openedx.ai.badges.empty.state.subtext',
-    defaultMessage: 'Let AI instantly design beautiful, custom badges based on your course context and learned skills.',
-    description: 'Subtext shown below the headline in the empty state',
   },
   'openedx.ai.badges.button.create': {
     id: 'openedx.ai.badges.button.create',

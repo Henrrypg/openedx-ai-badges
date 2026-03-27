@@ -11,6 +11,9 @@ import BadgeCard from './BadgeCard';
 import messages from './messages';
 import { GeneratedBadge } from '../types/badges';
 
+const Bold = (chunks: React.ReactNode) => <strong>{chunks}</strong>;
+const Br = () => <br />;
+
 interface GalleryViewProps {
   contextData: ReturnType<typeof services.prepareContextData>;
   onCreateNew: () => void;
@@ -59,6 +62,9 @@ console.debug(badges)
 
   return (
     <Container className="py-4">
+      <p>
+        {intl.formatMessage(messages['openedx-ai-badges.tab.description'], { bold: Bold, br: Br })}
+      </p>
       <h2 className="mb-4">{intl.formatMessage(messages['openedx.ai.badges.gallery.title'])}</h2>
       <DataTable
         isFilterable

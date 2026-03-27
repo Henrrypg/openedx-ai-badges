@@ -1,3 +1,3 @@
-import AIBadgesTab from './AIBadgesTab';
+import AIBadgesTab from '../../AIBadgesTab';
 
 export default AIBadgesTab;

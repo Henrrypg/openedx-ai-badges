@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import { Container, Spinner, Alert } from '@openedx/paragon';
+import { useQueryClient } from '@tanstack/react-query';
 import { services } from '@openedx/openedx-ai-extensions-ui';
 import { useProfileConfig } from './data/apiHooks';
+import { pluginId } from './contants';
 import { GalleryView } from './badge-list';
 import { EditorView } from './badge-editor';
 import type { GeneratedBadge } from './types/badges';
@@ -29,6 +31,12 @@ const AIBadgesTab = ({
     () => services.prepareContextData({ uiSlotSelectorId, courseId, locationId }),
     [courseId, locationId, uiSlotSelectorId],
   );
+
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: [pluginId, 'badges-list'], exact: false });
+  }, [queryClient]);
 
   const { data: profileConfig, isLoading: isLoadingProfile } = useProfileConfig(contextData);
 
@@ -85,6 +93,7 @@ const AIBadgesTab = ({
       )}
       {activeView === 'editor' && (
         <EditorView
+          key={(selectedBadge as any)?.id ?? 'new'}
           badge={selectedBadge}
           contextData={contextData}
           onBack={onBack}

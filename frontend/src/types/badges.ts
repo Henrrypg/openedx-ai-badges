@@ -22,6 +22,7 @@ export interface BadgeFormData {
   level: string;
   criterion: string;
   skillsEnabled: boolean;
+  additionalInstructions: string;
 }
 
 /** Keys that identify editable sections of the generated badge response. */
@@ -170,16 +171,17 @@ export interface BadgeVersion {
 
 /**
  * A badge entry stored in the session's ``badges[]`` array.
- *
- * The ``completeInfo`` field has the same shape as ``GeneratedBadge``
- * (camelCased by the service layer).
+ * The generated data (courseContext, generatedResponse, badgeImage) is stored
+ * directly on the badge — there is no wrapping ``complete_info`` key.
  */
 export interface PersistedBadge {
   id: string;
   status: BadgeStatus;
   createdAt: string;
-  completeInfo: GeneratedBadge;
   versions: BadgeVersion[];
+  courseContext?: CourseContext;
+  generatedResponse?: GeneratedResponse;
+  badgeImage?: BadgeImageResult;
 }
 
 /** Form data shape used by the Studio/Editor view. */

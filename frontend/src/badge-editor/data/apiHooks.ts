@@ -1,8 +1,122 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { services } from '@openedx/openedx-ai-extensions-ui';
-import { BadgeStatus, GeneratedBadge } from '../../types/badges';
-import { saveBadge, deleteDraft } from './api';
+import {
+  ApiService, BadgeFormData, BadgeStatus, BadgeWorkflowAction, GeneratedBadge,
+} from '../../types/badges';
+import {
+  generateBadge, getRunStatus, getApiStatus, saveBadge, deleteDraft,
+  generateImageAsync, getImageStatus,
+} from './api';
 import { pluginId } from '../../contants';
+
+const API_STATUS_POLL_MS = 60_000;
+const RUN_STATUS_POLL_MS = 5_000;
+const IMAGE_STATUS_POLL_MS = 5_000;
+
+const queryKeys = {
+  all: [pluginId, 'badges'],
+  runStatus: (contextData) => [...queryKeys.all, 'run-status', contextData],
+  imageStatus: (contextData) => [...queryKeys.all, 'image-status', contextData],
+  apiStatus: (contextData) => [...queryKeys.all, 'api-status', contextData],
+};
+
+export const useApiStatus = (
+  contextData: ReturnType<typeof services.prepareContextData>,
+  enabled = true,
+) => {
+  const query = useQuery<Record<string, ApiService>>({
+    queryKey: queryKeys.apiStatus(contextData),
+    queryFn: () => getApiStatus(contextData),
+    enabled,
+    refetchInterval: API_STATUS_POLL_MS,
+  });
+
+  const isServicesReady = !query.data
+    || !Object.values(query.data).some((s) => s.required && s.status === 'unavailable');
+
+  return {
+    services: query.data ?? null,
+    isLoading: query.isLoading,
+    isServicesReady,
+    refresh: query.refetch,
+  };
+};
+
+export const useBadgeGenerate = (
+  contextData: ReturnType<typeof services.prepareContextData>,
+) => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: ({ formData, action = 'run' }: { formData: BadgeFormData; action?: BadgeWorkflowAction }) => generateBadge(contextData, formData, action),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.runStatus(contextData) });
+    },
+  });
+
+  const polling = useQuery({
+    queryKey: queryKeys.runStatus(contextData),
+    queryFn: () => getRunStatus(contextData),
+    enabled: mutation.isSuccess && mutation.data?.status === 'processing',
+    refetchInterval: (data) => {
+      if (!data || data.status === 'processing') return RUN_STATUS_POLL_MS;
+      return false;
+    },
+  });
+
+  const isGenerating = mutation.isLoading || polling.data?.status === 'processing';
+  const generatedBadge = polling.data?.status === 'completed' ? polling.data.response ?? null : null;
+  const statusMessage = polling.data?.message ?? (mutation.isSuccess ? mutation.data?.message ?? null : null);
+  const generationError = mutation.error instanceof Error
+    ? mutation.error.message
+    : polling.data?.status === 'error'
+      ? polling.data.error ?? 'Generation failed'
+      : null;
+
+  return {
+    generate: mutation.mutate,
+    isGenerating,
+    statusMessage,
+    generationError,
+    generatedBadge,
+  };
+};
+
+export const useImageGenerate = (
+  contextData: ReturnType<typeof services.prepareContextData>,
+) => {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (inputData: Record<string, unknown>) => generateImageAsync(contextData, inputData),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: queryKeys.imageStatus(contextData) });
+    },
+  });
+
+  const polling = useQuery({
+    queryKey: queryKeys.imageStatus(contextData),
+    queryFn: () => getImageStatus(contextData),
+    enabled: mutation.isSuccess && mutation.data?.status === 'processing',
+    refetchInterval: (data) => {
+      if (!data || data.status === 'processing') return IMAGE_STATUS_POLL_MS;
+      return false;
+    },
+  });
+
+  const isGeneratingImage = mutation.isLoading || polling.data?.status === 'processing';
+  const generatedImage = polling.data?.status === 'completed' ? polling.data.response ?? null : null;
+  const imageStatusMessage = polling.data?.message ?? (isGeneratingImage ? (mutation.data?.message ?? null) : null);
+  const imageError = polling.data?.status === 'error' ? polling.data.error ?? 'Image generation failed' : null;
+
+  return {
+    generateImage: mutation.mutate,
+    isGeneratingImage,
+    imageStatusMessage,
+    imageError,
+    generatedImage,
+  };
+};
 
 export const useBadgeSave = (
   contextData: ReturnType<typeof services.prepareContextData>,
