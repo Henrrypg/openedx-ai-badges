@@ -3,7 +3,7 @@ import {
 } from 'react';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import { Container, Spinner, Alert } from '@openedx/paragon';
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { services } from '@openedx/openedx-ai-extensions-ui';
 import { useProfileConfig } from './data/apiHooks';
 import { GalleryView } from './badge-list';
@@ -21,7 +21,8 @@ interface AIBadgesTabProps {
   courseId: string | null;
   locationId?: string | null;
 }
-const AIBadgesTab = ({
+
+const AIBadgesTabContent = ({
   uiSlotSelectorId = 'authoring-resources-ai-badge-creator-modal',
   courseId,
   locationId,
@@ -105,6 +106,15 @@ const AIBadgesTab = ({
         />
       )}
     </Container>
+  );
+};
+
+const AIBadgesTab = (props: AIBadgesTabProps) => {
+  const [client] = useState(() => new QueryClient());
+  return (
+    <QueryClientProvider client={client}>
+      <AIBadgesTabContent {...props} />
+    </QueryClientProvider>
   );
 };
 
