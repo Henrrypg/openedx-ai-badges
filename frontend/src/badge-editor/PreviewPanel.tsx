@@ -9,12 +9,17 @@ import { GeneratedBadge, BadgeImageResult, BadgeVersion } from '../types/badges'
 import { useImageGenerate, useApiStatus } from './data/apiHooks';
 import messages from './messages';
 import ApiStatusPanel from './components/ApiStatusPanel';
+import VersionThumbnails from './components/VersionThumbnails';
+
+const toSrc = (image: BadgeImageResult) => (
+  image.base64.startsWith('data:') ? image.base64 : `data:image/png;base64,${image.base64}`
+);
 
 interface PreviewPanelProps {
   contextData: ReturnType<typeof services.prepareContextData>;
+  onImageGenerated: (image: BadgeImageResult) => void;
   badge?: GeneratedBadge | null;
   versions?: BadgeVersion[];
-  onImageGenerated?: (image: BadgeImageResult) => void;
   onError?: (message: string) => void;
 }
 
@@ -37,14 +42,12 @@ const PreviewPanel = ({
   const prevGeneratedImage = useRef<BadgeImageResult | null>(generatedImage);
   const prevImageError = useRef<string | null>(null);
 
-  // Append each newly generated image to the local version history
   useEffect(() => {
     if (generatedImage && generatedImage !== prevGeneratedImage.current) {
       prevGeneratedImage.current = generatedImage;
       setSessionImage(generatedImage);
       setLocalVersions((prev) => [generatedImage, ...prev]);
       setSelectedVersionImage(null);
-      onImageGenerated?.(generatedImage);
     }
   }, [generatedImage, onImageGenerated]);
 
@@ -69,10 +72,6 @@ const PreviewPanel = ({
       badge_description: achievement?.description ?? '',
     });
   };
-
-  const toSrc = (image: BadgeImageResult) => (
-    image.base64.startsWith('data:') ? image.base64 : `data:image/png;base64,${image.base64}`
-  );
 
   // Combine badge versions from props with locally generated ones (deduplicated by base64)
   const allVersionImages: BadgeImageResult[] = [
@@ -144,23 +143,14 @@ const PreviewPanel = ({
         </Button>
       </div>
 
-      <div className="d-flex gap-2 flex-wrap badge-preview__versions">
-        {allVersionImages.slice(0, 6).map((image, idx) => {
-          const isActive = selectedVersionImage === image;
-          return (
-            <button
-              // eslint-disable-next-line react/no-array-index-key
-              key={idx}
-              type="button"
-              onClick={() => setSelectedVersionImage(isActive ? null : image)}
-              className={`badge-preview__version-thumb rounded p-0 border-0 bg-transparent${isActive ? ' badge-preview__version-thumb--active' : ''}`}
-              aria-pressed={isActive}
-            >
-              <img src={toSrc(image)} alt="" className="img-fluid rounded" />
-            </button>
-          );
-        })}
-      </div>
+      <VersionThumbnails
+        images={allVersionImages.slice(0, 6)}
+        selectedImage={selectedVersionImage}
+        onSelect={(image) => {
+          setSelectedVersionImage(image);
+          onImageGenerated(image);
+        }}
+      />
       <ApiStatusPanel contextData={contextData} />
     </div>
   );

@@ -193,6 +193,11 @@ const messages = defineMessages({
     defaultMessage: 'Generating image...',
     description: 'Button label shown while badge image generation is in progress',
   },
+  'openedx.ai.badges.editor.preview.selectVersion': {
+    id: 'openedx.ai.badges.editor.preview.selectVersion',
+    defaultMessage: 'Select version {index}',
+    description: 'Accessible label for version thumbnail buttons',
+  },
 
   'openedx.ai.badges.editor.edit.title': {
     id: 'openedx.ai.badges.editor.edit.title',
