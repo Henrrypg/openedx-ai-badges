@@ -24,10 +24,10 @@ const BadgeCard = ({ className, original: badge, onEdit }: BadgeCardProps) => {
   let imageSrc = fallbackSrc;
 
   if (badgeImage) {
-    const { base64 } = badgeImage;
-    imageSrc = base64.startsWith('data:')
-      ? base64
-      : `data:image/png;base64,${base64}`;
+    const { b64 } = badgeImage;
+    imageSrc = b64.startsWith('data:')
+      ? b64
+      : `data:image/png;base64,${b64}`;
   }
 
   return (

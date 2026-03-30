@@ -168,7 +168,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         if 'badge_image' in input_data and input_data['badge_image']:
             new_image = input_data['badge_image']
             current_image = badge.get('badge_image')
-            if not current_image or current_image.get('base_64') != new_image.get('base_64'):
+            if not current_image or current_image.get('b64') != new_image.get('b64'):
                 badge.setdefault('versions', []).insert(0, {
                     'id': str(uuid.uuid4()),
                     'badge_image': new_image,
@@ -395,7 +395,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 - scale_factor: float
                 - (other fields depending on mode)
         Returns:
-            dict: The API response (base64 + config) and status.
+            dict: The API response (b64 + config) and status.
         """
         image_api_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_URL', 'http://mit-slm-image:3001')
         if not image_api_url:
@@ -441,7 +441,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             raw_data = response.json()
 
             badge_image_data = {
-                "base64": raw_data.get("data", {}).get("base64", ""),
+                "b64": raw_data.get("data", {}).get("base64", ""),
                 "config": raw_data.get("config", {})
             }
 

@@ -88,7 +88,7 @@ export interface GeneratedResponse {
 
 /** Result from the badge image generation API. */
 export interface BadgeImageResult {
-  base64: string;
+  b64: string;
   config: Record<string, unknown>;
 }
 

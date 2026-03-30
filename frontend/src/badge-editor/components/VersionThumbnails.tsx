@@ -12,7 +12,7 @@ const VersionThumbnails = ({ images, selectedImage, onSelect }: VersionThumbnail
   const intl = useIntl();
 
   const toSrc = (image: BadgeImageResult) => (
-    image.base64.startsWith('data:') ? image.base64 : `data:image/png;base64,${image.base64}`
+    image.b64.startsWith('data:') ? image.b64 : `data:image/png;base64,${image.b64}`
   );
 
   if (images.length === 0) {
@@ -22,10 +22,10 @@ const VersionThumbnails = ({ images, selectedImage, onSelect }: VersionThumbnail
   return (
     <div className="d-flex gap-2 flex-wrap badge-preview__versions">
       {images.map((image, idx) => {
-        const isActive = selectedImage?.base64 === image.base64;
+        const isActive = selectedImage?.b64 === image.b64;
         return (
           <button
-            key={image.base64}
+            key={image.b64}
             type="button"
             onClick={(e) => {
               e.stopPropagation();

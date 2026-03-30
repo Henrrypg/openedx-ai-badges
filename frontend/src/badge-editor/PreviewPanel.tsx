@@ -12,7 +12,7 @@ import ApiStatusPanel from './components/ApiStatusPanel';
 import VersionThumbnails from './components/VersionThumbnails';
 
 const toSrc = (image: BadgeImageResult) => (
-  image.base64.startsWith('data:') ? image.base64 : `data:image/png;base64,${image.base64}`
+  image.b64.startsWith('data:') ? image.b64 : `data:image/png;base64,${image.b64}`
 );
 
 interface PreviewPanelProps {
@@ -77,7 +77,7 @@ const PreviewPanel = ({
   const allVersionImages: BadgeImageResult[] = [
     ...localVersions,
     ...(versions.flatMap((v) => (v.badgeImage ? [v.badgeImage] : []))),
-  ].filter((img, idx, arr) => arr.findIndex((i) => i.base64 === img.base64) === idx);
+  ].filter((img, idx, arr) => arr.findIndex((i) => i.b64 === img.b64) === idx);
 
   return (
     <div>

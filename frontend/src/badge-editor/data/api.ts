@@ -71,7 +71,7 @@ export const generateImageAsync = async (
 export const getImageStatus = async (
   contextData: ReturnType<typeof services.prepareContextData>,
 ): Promise<{ status: string; response?: {
-  base64: string; config:
+  b64: string; config:
   Record<string, unknown>
 }; message?: string; error?: string }> => {
   const result = await services.callWorkflowService({
@@ -79,7 +79,7 @@ export const getImageStatus = async (
     context: contextData,
   });
   return result as { status: string; response?: {
-    base64: string;
+    b64: string;
     config: Record<string, unknown>
   }; message?: string; error?: string };
 };
