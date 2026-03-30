@@ -66,6 +66,52 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         self._get_badges().append(badge)
         return badge
 
+    def _resolve_regenerate_context(self, input_data):
+        """
+        Resolve the badge, previous generated response, and course context for a regeneration call.
+
+        Looks up the badge by ``badge_id`` when provided; falls back to the
+        legacy ``complete_info`` key for backward compatibility.  Also fetches
+        (or reuses) the course context and validates that a prior badge
+        definition exists before any expensive work is done.
+
+        Returns:
+            tuple: ``(badge, course_context, previous_generated_response)`` on
+                   success, or an error dict ``{"error": ..., "status": "error"}``
+                   that the caller should return immediately.
+        """
+        badge_id = input_data.get('badge_id')
+        badge = None
+
+        if badge_id:
+            _, badge = self._find_badge(badge_id)
+            if badge is None:
+                return {'error': f'Badge {badge_id} not found', 'status': 'error'}
+            previous_generated_response = badge.get('generated_response', {})
+        else:
+            if not self.session.metadata.get('complete_info'):
+                return {
+                    "error": "No previous generation found to regenerate from.",
+                    "status": "error",
+                }
+            previous_generated_response = self.session.metadata['complete_info'].get('generated_response', {})
+
+        if not previous_generated_response.get('credentialSubject'):
+            return {
+                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
+                "status": "error",
+            }
+
+        if badge is not None and badge.get('course_context'):
+            course_context = badge['course_context']
+        else:
+            self._set_status_message("Fetching course content...")
+            course_context = self._get_course_context()
+            if isinstance(course_context, dict) and 'error' in course_context:
+                return course_context
+
+        return badge, course_context, previous_generated_response
+
     # ------------------------------------------------------------------
     # CRUD actions exposed to the frontend
     # ------------------------------------------------------------------
@@ -205,27 +251,10 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         Returns:
             dict: Response containing the regenerated badge and status
         """
-        badge_id = input_data.get('badge_id')
-        badge = None
-
-        if badge_id:
-            _, badge = self._find_badge(badge_id)
-            if badge is None:
-                return {'error': f'Badge {badge_id} not found', 'status': 'error'}
-            previous_generated_response = badge.get('generated_response', {})
-        else:
-            if not self.session.metadata.get('complete_info'):
-                return {
-                    "error": "No previous generation found to regenerate from.",
-                    "status": "error",
-                }
-            previous_generated_response = self.session.metadata['complete_info'].get('generated_response', {})
-
-        if not previous_generated_response.get('credentialSubject'):
-            return {
-                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
-                "status": "error",
-            }
+        context = self._resolve_regenerate_context(input_data)
+        if isinstance(context, dict):
+            return context
+        badge, course_context, previous_generated_response = context
 
         skills_requested = input_data.get('skills_enabled', False) or input_data.get('skillsEnabled', False)
         if skills_requested and not previous_generated_response.get('skills'):
@@ -236,14 +265,6 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
 
         input_data['previous_badge'] = previous_generated_response.get('credentialSubject', {}).get('achievement', {})
         input_data['previous_skills'] = previous_generated_response.get('skills', [])
-
-        if badge is not None and badge.get('course_context'):
-            course_context = badge['course_context']
-        else:
-            self._set_status_message("Fetching course content...")
-            course_context = self._get_course_context()
-            if isinstance(course_context, dict) and 'error' in course_context:
-                return course_context
 
         complete_info = {}
         complete_info['course_context'] = course_context
@@ -276,8 +297,8 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         complete_info['generated_response'] = generated_response
 
         if badge is not None:
-            badge['course_context'] = course_context
-            badge['generated_response'] = generated_response
+            badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
+            badge['generated_response'] = generated_response  # pylint: disable=unsupported-assignment-operation
             self.session.save(update_fields=['metadata'])
             return {"response": badge, "status": "completed"}
 
@@ -585,7 +606,7 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
     The ``save`` action is inherited from BadgeOrchestrator without changes.
     """
 
-    def get_api_status(self, input_data):  # pylint: disable=unused-argument
+    def get_api_status(self, input_data):
         """
         Check availability of the external services used by this orchestrator.
 
@@ -708,35 +729,10 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         Returns:
             dict: ``{"response": badge, "status": "completed"}``
         """
-        badge_id = input_data.get('badge_id')
-        badge = None
-
-        if badge_id:
-            _, badge = self._find_badge(badge_id)
-            if badge is None:
-                return {'error': f'Badge {badge_id} not found', 'status': 'error'}
-            previous_generated_response = badge.get('generated_response', {})
-        else:
-            if not self.session.metadata.get('complete_info'):
-                return {
-                    "error": "No previous generation found to regenerate from.",
-                    "status": "error",
-                }
-            previous_generated_response = self.session.metadata['complete_info'].get('generated_response', {})
-
-        if not previous_generated_response.get('credentialSubject'):
-            return {
-                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
-                "status": "error",
-            }
-
-        if badge is not None and badge.get('course_context'):
-            course_context = badge['course_context']
-        else:
-            self._set_status_message("Fetching course content...")
-            course_context = self._get_course_context()
-            if isinstance(course_context, dict) and 'error' in course_context:
-                return course_context
+        context = self._resolve_regenerate_context(input_data)
+        if isinstance(context, dict):
+            return context
+        badge, course_context, previous_generated_response = context
 
         self._set_status_message("Regenerating badge via MIT DCC API...")
         processor = MITDCCProcessor(self.profile.processor_config)
@@ -753,8 +749,8 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             return {**api_result, 'status': 'error'}
 
         if badge is not None:
-            badge['course_context'] = course_context
-            badge['generated_response'] = api_result
+            badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
+            badge['generated_response'] = api_result  # pylint: disable=unsupported-assignment-operation
             self.session.save(update_fields=['metadata'])
             return {"response": badge, "status": "completed"}
 
