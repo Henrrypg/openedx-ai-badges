@@ -745,4 +745,3 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         self.session.metadata['complete_info'] = complete_info
         self.session.save(update_fields=['metadata'])
         return {"response": complete_info, "status": "completed"}
-
