@@ -13,7 +13,6 @@
         "config": {
           "buttonText": "+",
           "customMessage": "Uses experimental mit-slm service with the MITDCCBadgeOrchestrator",
-          "apiStatusEnabled": "true"
         }
       },
       "response": {
@@ -24,5 +23,6 @@
       }
     }
   },
+  "api_checks": ["badge_api", "ollama", "image_api"],
   "schema_version": "1.0"
 }

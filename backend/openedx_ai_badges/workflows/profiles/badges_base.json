@@ -31,5 +31,6 @@
       }
     }
   },
+  "api_checks": ["image_api"],
   "schema_version": "1.0",
 }

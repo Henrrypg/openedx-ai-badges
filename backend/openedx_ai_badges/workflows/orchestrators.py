@@ -551,6 +551,25 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 'status': 'error'
             }
 
+    def get_api_status(self, input_data):  # pylint: disable=unused-argument
+        """Check availability of the image generation API."""
+        image_api_health_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_HEALTH_URL', '')
+
+        if not image_api_health_url:
+            status = 'not_configured'
+        else:
+            try:
+                resp = requests.get(image_api_health_url, timeout=5)
+                status = 'online' if resp.ok else 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                status = 'unavailable'
+
+        return {
+            'services': {
+                'image_api': {'status': status, 'required': False},
+            }
+        }
+
 
 class MITDCCBadgeOrchestrator(BadgeOrchestrator):
     """
