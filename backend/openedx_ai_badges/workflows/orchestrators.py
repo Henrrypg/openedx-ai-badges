@@ -1,9 +1,15 @@
 """
 Badge Orchestrator - Generates Open Badges 3.0 BadgeClass via async Celery tasks.
+
+Session metadata stores multiple badges per session under a ``badges`` list.
+Each badge entry has an ``id``, ``status`` (draft/published), ``complete_info``
+(the generated data), and ``versions`` (image history).
 """
 import json
 import logging
+import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import requests
@@ -25,6 +31,176 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
     Orchestrator to generate Open Badges 3.0 BadgeClass
     based on course context and optional skills.
     """
+
+    # ------------------------------------------------------------------
+    # Badge list helpers
+    # ------------------------------------------------------------------
+
+    def _get_badges(self):
+        """Return the badges list from session metadata, initializing if needed."""
+        if 'badges' not in self.session.metadata:
+            self.session.metadata['badges'] = []
+        return self.session.metadata['badges']
+
+    def _find_badge(self, badge_id):
+        """Find a badge by *id*. Returns ``(index, badge_dict)`` or ``(None, None)``."""
+        for i, badge in enumerate(self._get_badges()):
+            if badge['id'] == badge_id:
+                return i, badge
+        return None, None
+
+    def _set_image_status_message(self, message):
+        """Write an intermediate status message for image generation polling."""
+        self.session.metadata['image_task_status_message'] = message
+        self.session.save(update_fields=['metadata'])
+
+    def _add_badge_from_complete_info(self, complete_info):
+        """Create a draft badge entry from a completed generation result and append it to the badges list."""
+        badge = {
+            'id': str(uuid.uuid4()),
+            'status': 'draft',
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'versions': [],
+            **complete_info,
+        }
+        self._get_badges().append(badge)
+        return badge
+
+    def _resolve_regenerate_context(self, input_data):
+        """
+        Resolve the badge, previous generated response, and course context for a regeneration call.
+
+        Looks up the badge by ``badge_id`` when provided; falls back to the
+        legacy ``complete_info`` key for backward compatibility.  Also fetches
+        (or reuses) the course context and validates that a prior badge
+        definition exists before any expensive work is done.
+
+        Returns:
+            tuple: ``(badge, course_context, previous_generated_response)`` on
+                   success, or an error dict ``{"error": ..., "status": "error"}``
+                   that the caller should return immediately.
+        """
+        badge_id = input_data.get('badge_id')
+        badge = None
+
+        if badge_id:
+            _, badge = self._find_badge(badge_id)
+            if badge is None:
+                return {'error': f'Badge {badge_id} not found', 'status': 'error'}
+            previous_generated_response = badge.get('generated_response', {})
+        else:
+            if not self.session.metadata.get('complete_info'):
+                return {
+                    "error": "No previous generation found to regenerate from.",
+                    "status": "error",
+                }
+            previous_generated_response = self.session.metadata['complete_info'].get('generated_response', {})
+
+        has_subject = (previous_generated_response.get('credentialSubject')
+                       or previous_generated_response.get('credential_subject'))
+        if not has_subject:
+            return {
+                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
+                "status": "error",
+            }
+
+        if badge is not None and badge.get('course_context'):
+            course_context = badge['course_context']
+        else:
+            self._set_status_message("Fetching course content...")
+            course_context = self._get_course_context()
+            if isinstance(course_context, dict) and 'error' in course_context:
+                return course_context
+
+        return badge, course_context, previous_generated_response
+
+    # ------------------------------------------------------------------
+    # CRUD actions exposed to the frontend
+    # ------------------------------------------------------------------
+
+    def get_badges(self, input_data):  # pylint: disable=unused-argument
+        """
+        Return all badges stored in the current session.
+
+        Used by the frontend to determine the initial view state:
+        - Empty list → show Empty State (no badges created yet)
+        - Non-empty → show Gallery with badge cards
+
+        Returns:
+            dict: ``{"response": [...], "status": "completed"}`` or
+                  ``{"response": [], "status": "empty"}``.
+        """
+        badges = self._get_badges()
+        if badges:
+            return {"response": badges, "status": "completed"}
+        return {"response": [], "status": "empty"}
+
+    def save_badge(self, input_data):
+        """
+        Upsert a badge entry with the given status and content.
+
+        Args:
+            input_data: dict with ``badge_id`` (str | None), ``status``
+                        ('draft' | 'published'), ``course_context``,
+                        ``generated_response``, and optionally ``badge_image``.
+        """
+        badge_id = input_data.get('badge_id')
+        status = input_data.get('status', 'draft')
+
+        if badge_id:
+            _, badge = self._find_badge(badge_id)
+            if badge is None:
+                return {'error': f'Badge {badge_id} not found', 'status': 'error'}
+        else:
+            badge_id = str(uuid.uuid4())
+            badge = {
+                'id': badge_id,
+                'status': 'draft',
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'versions': [],
+            }
+            self._get_badges().append(badge)
+
+        if 'course_context' in input_data:
+            badge['course_context'] = input_data['course_context']
+        if 'generated_response' in input_data:
+            badge['generated_response'] = input_data['generated_response']
+        if 'badge_image' in input_data and input_data['badge_image']:
+            new_image = input_data['badge_image']
+            current_image = badge.get('badge_image')
+            if not current_image or current_image.get('b64') != new_image.get('b64'):
+                badge.setdefault('versions', []).insert(0, {
+                    'id': str(uuid.uuid4()),
+                    'badge_image': new_image,
+                    'created_at': datetime.now(timezone.utc).isoformat(),
+                })
+            badge['badge_image'] = new_image
+
+        badge['status'] = status
+        self.session.save(update_fields=['metadata'])
+        return {"response": badge, "status": "saved"}
+
+    def delete_draft(self, input_data):
+        """
+        Delete a draft badge by ID. Published badges cannot be deleted.
+        """
+        badge_id = input_data.get('badge_id')
+        if not badge_id:
+            return {'error': 'Missing badge_id', 'status': 'error'}
+
+        idx, badge = self._find_badge(badge_id)
+        if badge is None:
+            return {'error': f'Badge {badge_id} not found', 'status': 'error'}
+        if badge['status'] != 'draft':
+            return {'error': 'Only draft badges can be deleted', 'status': 'error'}
+
+        self._get_badges().pop(idx)
+        self.session.save(update_fields=['metadata'])
+        return {"response": None, "status": "deleted"}
+
+    # ------------------------------------------------------------------
+    # Existing actions
+    # ------------------------------------------------------------------
 
     def save(self, input_data):
         """
@@ -68,25 +244,17 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
     def regenerate(self, input_data):
         """
         Regenerate the badge using the existing session metadata.
+
         Args:
-            input_data: dict containing any necessary input for regeneration
+            input_data: dict containing any necessary input for regeneration.
+                Pass ``badge_id`` to update a specific badge in ``badges[]``.
         Returns:
             dict: Response containing the regenerated badge and status
         """
-        if not self.session.metadata.get('complete_info'):
-            return {
-                "error": "No previous generation found to regenerate from.",
-                "status": "error",
-            }
-
-        previous_complete_info = self.session.metadata['complete_info']
-        previous_generated_response = previous_complete_info.get('generated_response', {})
-
-        if not previous_generated_response.get('credentialSubject'):
-            return {
-                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
-                "status": "error",
-            }
+        context = self._resolve_regenerate_context(input_data)
+        if isinstance(context, dict):
+            return context
+        badge, course_context, previous_generated_response = context
 
         skills_requested = input_data.get('skills_enabled', False) or input_data.get('skillsEnabled', False)
         if skills_requested and not previous_generated_response.get('skills'):
@@ -95,13 +263,13 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 "status": "error",
             }
 
-        input_data['previous_badge'] = previous_generated_response.get('credentialSubject', {}).get('achievement', {})
+        credential_subject = (
+            previous_generated_response.get('credentialSubject')
+            or previous_generated_response.get('credential_subject')
+            or {}
+        )
+        input_data['previous_badge'] = credential_subject.get('achievement', {})
         input_data['previous_skills'] = previous_generated_response.get('skills', [])
-
-        self._set_status_message("Fetching course content...")
-        course_context = self._get_course_context()
-        if isinstance(course_context, dict) and 'error' in course_context:
-            return course_context
 
         complete_info = {}
         complete_info['course_context'] = course_context
@@ -122,6 +290,8 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             if isinstance(skills, dict) and 'error' in skills:
                 return skills
             generated_response['skills'] = skills
+        elif badge is not None:
+            generated_response['skills'] = previous_generated_response.get('skills', [])
 
         self._set_status_message("Generating badge definition...")
         credential_subject = self._get_achievement(complete_info, input_data, regenerate=True)
@@ -130,12 +300,64 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         generated_response['credentialSubject'] = credential_subject
 
         complete_info['generated_response'] = generated_response
+
+        if badge is not None:
+            badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
+            badge['generated_response'] = generated_response  # pylint: disable=unsupported-assignment-operation
+            self.session.save(update_fields=['metadata'])
+            return {"response": badge, "status": "completed"}
+
         self.session.metadata['complete_info'] = complete_info
         self.session.save(update_fields=['metadata'])
+        return {"response": complete_info, "status": "completed"}
+
+    def generate_image_async(self, input_data):
+        """
+        Launch async task to execute the generate_image method.
+        Uses separate ``image_task_*`` metadata keys so it does not
+        conflict with the badge-generation ``task_*`` keys.
+        """
+        self.session.metadata = self.session.metadata or {}
+        self.session.metadata['image_task_status'] = 'processing'
+        self.session.metadata.pop('image_task_result', None)
+        self.session.metadata.pop('image_task_error', None)
+        self.session.metadata.pop('image_task_status_message', None)
+        self.session.save()
+
+        task = _execute_orchestrator_async.delay(
+            session_id=self.session.id,
+            action='generate_image',
+            params={"input_data": input_data},
+        )
 
         return {
-            "response": complete_info,
-            "status": "completed",
+            'status': 'processing',
+            'task_id': task.id,
+            'message': 'Image generation has started',
+        }
+
+    def get_image_status(self, input_data):  # pylint: disable=unused-argument
+        """
+        Poll the status of an async image generation task.
+        Mirrors ``get_run_status`` but reads the ``image_task_*`` keys.
+        """
+        metadata = self.session.metadata or {}
+        status = metadata.get('image_task_status', 'idle')
+
+        if status == 'completed':
+            return {
+                'status': 'completed',
+                'response': metadata.get('image_task_result'),
+                'message': metadata.get('image_task_status_message'),
+            }
+        if status == 'error':
+            return {
+                'status': 'error',
+                'error': metadata.get('image_task_error', 'Image generation failed'),
+            }
+        return {
+            'status': status,
+            'message': metadata.get('image_task_status_message'),
         }
 
     def regenerate_async(self, input_data):
@@ -168,6 +390,85 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             'message': 'AI workflow has started',
         }
 
+    def generate_image(self, input_data):
+        """
+        Proxy image generation request to the external Image API.
+
+        Args:
+            input_data: dict containing:
+                - mode: 'icon_based', 'text_overlay', or 'config'
+                - scale_factor: float
+                - (other fields depending on mode)
+        Returns:
+            dict: The API response (b64 + config) and status.
+        """
+        image_api_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_URL', 'http://mit-slm-image:3001')
+        if not image_api_url:
+            return {'error': 'Image API URL not configured', 'status': 'error'}
+
+        mode = input_data.get('mode', 'icon_based')
+        scale_factor = input_data.get('scale_factor', 2.0)
+
+        if mode == 'text_overlay':
+            endpoint = f"{image_api_url}/api/v1/badge/generate-with-text"
+            payload = {
+                "image_type": "text_overlay",
+                "short_title": input_data.get('short_title'),
+                "achievement_phrase": input_data.get('achievement_phrase'),
+                "institution": input_data.get('institution', ''),
+                "institute_url": input_data.get('institute_url', ''),
+                "image_configuration": input_data.get('image_configuration', {}),
+                "scale_factor": scale_factor,
+            }
+        elif mode == 'config':
+            endpoint = f"{image_api_url}/api/v1/badge/generate"
+            payload = {
+                "config": input_data.get('config'),
+                "scale_factor": scale_factor,
+            }
+        else:  # icon_based
+            endpoint = f"{image_api_url}/api/v1/badge/generate-with-icon"
+            payload = {
+                "image_type": "icon_based",
+                "badge_name": input_data.get('badge_name'),
+                "badge_description": input_data.get('badge_description'),
+                "institution": input_data.get('institution', ''),
+                "institute_url": input_data.get('institute_url', ''),
+                "image_configuration": input_data.get('image_configuration', {}),
+                "scale_factor": scale_factor,
+            }
+
+        try:
+            self._set_image_status_message("Generating badge image...")
+            logger.info("Proxying image generation (%s) to: %s", mode, endpoint)
+            response = requests.post(endpoint, json=payload, timeout=60)
+            response.raise_for_status()
+            raw_data = response.json()
+
+            badge_image_data = {
+                "b64": raw_data.get("data", {}).get("base64", ""),
+                "config": raw_data.get("config", {})
+            }
+
+            # Persist image and mark image task complete
+            if 'complete_info' not in self.session.metadata:
+                self.session.metadata['complete_info'] = {}
+            self.session.metadata['complete_info']['badge_image'] = badge_image_data
+            self.session.metadata['image_task_status'] = 'completed'
+            self.session.metadata['image_task_result'] = badge_image_data
+            self.session.save(update_fields=['metadata'])
+
+            return {
+                "response": badge_image_data,
+                "status": "completed",
+            }
+        except Exception as e:      # pylint: disable=broad-exception-caught
+            logger.error("Image generation failed: %s", str(e))
+            self.session.metadata['image_task_status'] = 'error'
+            self.session.metadata['image_task_error'] = str(e)
+            self.session.save(update_fields=['metadata'])
+            return {'error': f"Image generation failed: {str(e)}", 'status': 'error'}
+
     def run(self, input_data):
         """
         Execute the badge generation workflow.
@@ -176,13 +477,6 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         Returns:
             dict: Final response containing the generated badge and status
         """
-        if self.session.metadata.get('complete_info'):
-            complete_info = self.session.metadata['complete_info']
-            return {
-                "response": complete_info,
-                "status": "completed",
-            }
-
         self._set_status_message("Fetching course content...")
         course_context = self._get_course_context()
         if isinstance(course_context, dict) and 'error' in course_context:
@@ -217,12 +511,10 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
 
         complete_info['generated_response'] = generated_response
         self.session.metadata['complete_info'] = complete_info
+        badge = self._add_badge_from_complete_info(complete_info)
         self.session.save(update_fields=['metadata'])
 
-        return {
-            "response": complete_info,
-            "status": "completed",
-        }
+        return {"response": badge, "status": "completed"}
 
     def _get_course_context(self):
         """Run OpenEdXProcessor and return course context or error dict."""
@@ -285,6 +577,25 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 'status': 'error'
             }
 
+    def get_api_status(self, input_data):  # pylint: disable=unused-argument
+        """Check availability of the image generation API."""
+        image_api_health_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_HEALTH_URL', '')
+
+        if not image_api_health_url:
+            status = 'not_configured'
+        else:
+            try:
+                resp = requests.get(image_api_health_url, timeout=5)
+                status = 'online' if resp.ok else 'unavailable'
+            except Exception:   # pylint: disable=broad-exception-caught
+                status = 'unavailable'
+
+        return {
+            'services': {
+                'image_api': {'status': status, 'required': False},
+            }
+        }
+
 
 class MITDCCBadgeOrchestrator(BadgeOrchestrator):
     """
@@ -300,7 +611,7 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
     The ``save`` action is inherited from BadgeOrchestrator without changes.
     """
 
-    def get_api_status(self, input_data):  # pylint: disable=unused-argument
+    def get_api_status(self, input_data):
         """
         Check availability of the external services used by this orchestrator.
 
@@ -384,14 +695,8 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             input_data: dict containing user form fields (style, tone, level,
                         criterion, skillsEnabled, …)
         Returns:
-            dict: ``{"response": complete_info, "status": "completed"}``
+            dict: ``{"response": badge, "status": "completed"}``
         """
-        if self.session.metadata.get('complete_info'):
-            return {
-                "response": self.session.metadata['complete_info'],
-                "status": "completed",
-            }
-
         self._set_status_message("Fetching course content...")
         course_context = self._get_course_context()
         if isinstance(course_context, dict) and 'error' in course_context:
@@ -413,12 +718,10 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         }
 
         self.session.metadata['complete_info'] = complete_info
+        badge = self._add_badge_from_complete_info(complete_info)
         self.session.save(update_fields=['metadata'])
 
-        return {
-            "response": complete_info,
-            "status": "completed",
-        }
+        return {"response": badge, "status": "completed"}
 
     def regenerate(self, input_data):
         """
@@ -426,29 +729,15 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         badge result as additional context so the model can improve on it.
 
         Args:
-            input_data: dict containing updated user form fields
+            input_data: dict containing updated user form fields.
+                        Pass ``badge_id`` to update a specific badge in ``badges[]``.
         Returns:
-            dict: ``{"response": complete_info, "status": "completed"}``
+            dict: ``{"response": badge, "status": "completed"}``
         """
-        if not self.session.metadata.get('complete_info'):
-            return {
-                "error": "No previous generation found to regenerate from.",
-                "status": "error",
-            }
-
-        previous_complete_info = self.session.metadata['complete_info']
-        previous_generated_response = previous_complete_info.get('generated_response', {})
-
-        if not previous_generated_response.get('credentialSubject'):
-            return {
-                "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
-                "status": "error",
-            }
-
-        self._set_status_message("Fetching course content...")
-        course_context = self._get_course_context()
-        if isinstance(course_context, dict) and 'error' in course_context:
-            return course_context
+        context = self._resolve_regenerate_context(input_data)
+        if isinstance(context, dict):
+            return context
+        badge, course_context, previous_generated_response = context
 
         self._set_status_message("Regenerating badge via MIT DCC API...")
         processor = MITDCCProcessor(self.profile.processor_config)
@@ -464,89 +753,16 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         if isinstance(api_result, dict) and 'error' in api_result:
             return {**api_result, 'status': 'error'}
 
+        if badge is not None:
+            badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
+            badge['generated_response'] = api_result  # pylint: disable=unsupported-assignment-operation
+            self.session.save(update_fields=['metadata'])
+            return {"response": badge, "status": "completed"}
+
         complete_info = {
             'course_context': course_context,
             'generated_response': api_result,
         }
-
         self.session.metadata['complete_info'] = complete_info
         self.session.save(update_fields=['metadata'])
-
-        return {
-            "response": complete_info,
-            "status": "completed",
-        }
-
-    def generate_image(self, input_data):
-        """
-        Proxy image generation request to the external MIT DCC Image API.
-
-        Args:
-            input_data: dict containing:
-                - mode: 'icon_based', 'text_overlay', or 'config'
-                - scale_factor: float
-                - (other fields depending on mode)
-        Returns:
-            dict: The API response (base64 + config) and status.
-        """
-        image_api_url = getattr(settings, 'MIT_DCC_BADGE_IMAGE_API_URL', 'http://mit-slm-image:3001')
-        if not image_api_url:
-            return {'error': 'Image API URL not configured', 'status': 'error'}
-
-        mode = input_data.get('mode', 'icon_based')
-        scale_factor = input_data.get('scale_factor', 2.0)
-
-        if mode == 'text_overlay':
-            endpoint = f"{image_api_url}/api/v1/badge/generate-with-text"
-            payload = {
-                "image_type": "text_overlay",
-                "short_title": input_data.get('short_title'),
-                "achievement_phrase": input_data.get('achievement_phrase'),
-                "institution": input_data.get('institution', ''),
-                "institute_url": input_data.get('institute_url', ''),
-                "image_configuration": input_data.get('image_configuration', {}),
-                "scale_factor": scale_factor,
-            }
-        elif mode == 'config':
-            endpoint = f"{image_api_url}/api/v1/badge/generate"
-            payload = {
-                "config": input_data.get('config'),
-                "scale_factor": scale_factor,
-            }
-        else:  # icon_based
-            endpoint = f"{image_api_url}/api/v1/badge/generate-with-icon"
-            payload = {
-                "image_type": "icon_based",
-                "badge_name": input_data.get('badge_name'),
-                "badge_description": input_data.get('badge_description'),
-                "institution": input_data.get('institution', ''),
-                "institute_url": input_data.get('institute_url', ''),
-                "image_configuration": input_data.get('image_configuration', {}),
-                "scale_factor": scale_factor,
-            }
-
-        try:
-            logger.info("Proxying image generation (%s) to: %s", mode, endpoint)
-            response = requests.post(endpoint, json=payload, timeout=60)
-            response.raise_for_status()
-            raw_data = response.json()
-
-            # Normalize for the frontend: ensure we have base64 and config at the top level
-            badge_image_data = {
-                "base64": raw_data.get("data", {}).get("base64", ""),
-                "config": raw_data.get("config", {})
-            }
-
-            # Persist result
-            if 'complete_info' not in self.session.metadata:
-                self.session.metadata['complete_info'] = {}
-            self.session.metadata['complete_info']['badge_image'] = badge_image_data
-            self.session.save(update_fields=['metadata'])
-
-            return {
-                "response": badge_image_data,
-                "status": "completed",
-            }
-        except Exception as e:      # pylint: disable=broad-exception-caught
-            logger.error("Image generation failed: %s", str(e))
-            return {'error': f"Image generation failed: {str(e)}", 'status': 'error'}
+        return {"response": complete_info, "status": "completed"}
