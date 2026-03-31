@@ -149,8 +149,6 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             _, badge = self._find_badge(badge_id)
             if badge is None:
                 return {'error': f'Badge {badge_id} not found', 'status': 'error'}
-            if badge['status'] == 'published':
-                return {'error': 'Published badges cannot be edited', 'status': 'error'}
         else:
             badge_id = str(uuid.uuid4())
             badge = {

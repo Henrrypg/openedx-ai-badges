@@ -59,8 +59,6 @@ const BadgeCard = ({ className, original: badge, onEdit }: BadgeCardProps) => {
             block
             variant="secondary"
             iconBefore={Edit}
-            disabled={!isDraft}
-            className={isDraft ? '' : 'invisible'}
             onClick={() => onEdit?.(badge)}
           >
             {intl.formatMessage(messages['openedx.ai.badges.card.edit'])}

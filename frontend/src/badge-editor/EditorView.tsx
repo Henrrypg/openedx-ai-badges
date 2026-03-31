@@ -47,6 +47,7 @@ const EditorView = ({
   const currentBadge = editedBadge ?? badge ?? null;
   const showEditForm = !!currentBadge;
   const badgeTitle = currentBadge?.generatedResponse?.credentialSubject?.achievement?.name ?? '';
+  const isAlreadyPublished = badge?.status === 'published';
 
   const handleBadgeGenerated = useCallback((generated: GeneratedBadge) => {
     setEditedBadge(generated);
@@ -78,6 +79,7 @@ const EditorView = ({
         badgeTitle={badgeTitle}
         isNewBadge={isNewBadge}
         isBadgeReady={!!currentBadge}
+        isAlreadyPublished={isAlreadyPublished}
         hasUnsavedChanges={!!editedBadge || !!lastGeneratedImage}
         isSaving={save.isLoading || remove.isLoading}
         onBack={onBack}

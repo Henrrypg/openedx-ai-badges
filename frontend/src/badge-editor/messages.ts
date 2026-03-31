@@ -317,8 +317,38 @@ const messages = defineMessages({
   },
   'openedx.ai.badges.editor.header.savePublish': {
     id: 'openedx.ai.badges.editor.header.savePublish',
-    defaultMessage: 'Save',
-    description: 'Button label to save and publish the badge',
+    defaultMessage: 'Publish',
+    description: 'Button label to publish the badge',
+  },
+  'openedx.ai.badges.editor.confirm.publish.title': {
+    id: 'openedx.ai.badges.editor.confirm.publish.title',
+    defaultMessage: 'Republish badge',
+    description: 'Title of the confirmation modal when republishing an already-published badge',
+  },
+  'openedx.ai.badges.editor.confirm.publish.body': {
+    id: 'openedx.ai.badges.editor.confirm.publish.body',
+    defaultMessage: 'You\'re republishing a badge that is already published. This could have unintended consequences for downstream services that listen for this event. Are you sure you want to continue?',
+    description: 'Body of the confirmation modal when republishing an already-published badge',
+  },
+  'openedx.ai.badges.editor.confirm.draft.title': {
+    id: 'openedx.ai.badges.editor.confirm.draft.title',
+    defaultMessage: 'Save draft of published badge',
+    description: 'Title of the confirmation modal when saving a draft of an already-published badge',
+  },
+  'openedx.ai.badges.editor.confirm.draft.body': {
+    id: 'openedx.ai.badges.editor.confirm.draft.body',
+    defaultMessage: 'You\'re saving a draft of an already published badge. This could have unintended consequences. Are you sure you want to continue?',
+    description: 'Body of the confirmation modal when saving a draft of an already-published badge',
+  },
+  'openedx.ai.badges.editor.confirm.cancel': {
+    id: 'openedx.ai.badges.editor.confirm.cancel',
+    defaultMessage: 'Cancel',
+    description: 'Cancel button in the confirmation modal',
+  },
+  'openedx.ai.badges.editor.confirm.continue': {
+    id: 'openedx.ai.badges.editor.confirm.continue',
+    defaultMessage: 'Continue',
+    description: 'Confirm button in the confirmation modal',
   },
 
   'openedx.ai.badges.editor.error.save': {
