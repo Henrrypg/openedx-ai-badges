@@ -96,7 +96,9 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 }
             previous_generated_response = self.session.metadata['complete_info'].get('generated_response', {})
 
-        if not (previous_generated_response.get('credentialSubject') or previous_generated_response.get('credential_subject')):
+        has_subject = (previous_generated_response.get('credentialSubject')
+                       or previous_generated_response.get('credential_subject'))
+        if not has_subject:
             return {
                 "error": "Previous badge definition is missing. Cannot regenerate without a prior badge.",
                 "status": "error",

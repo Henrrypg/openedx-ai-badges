@@ -62,7 +62,17 @@ const BadgeCard = ({ className, original: badge, onEdit }: BadgeCardProps) => {
                   : intl.formatMessage(messages['openedx.ai.badges.card.status.published'])}
               </Badge>
               {description && (
-                <p className="small text-muted mb-0" style={{ overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical' }}>{description}</p>
+                <p
+                  className="small text-muted mb-0"
+                  style={{
+                    overflow: 'hidden',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 4,
+                    WebkitBoxOrient: 'vertical',
+                  }}
+                >
+                  {description}
+                </p>
               )}
             </div>
             <Button

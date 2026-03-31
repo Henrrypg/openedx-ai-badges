@@ -31,7 +31,7 @@ export const useApiStatus = (
     queryFn: () => getApiStatus(contextData),
     enabled,
     retry: 2,
-    refetchInterval: (data, q) => (q.state.status === 'error' ? false : API_STATUS_POLL_MS),
+    refetchInterval: (_data, q) => (q.state.status === 'error' ? false : API_STATUS_POLL_MS),
   });
 
   const isServicesReady = !query.data

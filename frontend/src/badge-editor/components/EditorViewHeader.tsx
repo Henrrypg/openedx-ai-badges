@@ -111,8 +111,8 @@ const EditorViewHeader = ({
           src={Close}
           iconAs={Icon}
           onClick={onBack}
-          disabled={isSaving}
           alt={intl.formatMessage(messages['openedx.ai.badges.editor.header.back'])}
+          {...({ disabled: isSaving } as {})}
         />
       </ActionRow>
 
