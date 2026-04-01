@@ -86,6 +86,16 @@ export interface GeneratedResponse {
   enableImageGeneration?: boolean;
 }
 
+/** Configuration sent to the image generation API to control the badge appearance. */
+export interface ImageConfiguration {
+  primary_color?: string;
+  secondary_color?: string;
+  border_color?: string;
+  border_width?: number;
+  shape?: string;
+  ribbon_type?: string;
+}
+
 /** Result from the badge image generation API. */
 export interface BadgeImageResult {
   b64: string;

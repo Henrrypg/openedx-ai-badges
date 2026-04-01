@@ -422,6 +422,117 @@ const messages = defineMessages({
     defaultMessage: 'Failed to generate the badge image. Please try again.',
     description: 'Error alert shown when badge image generation fails',
   },
+
+  'openedx.ai.badges.editor.imageConfig.title': {
+    id: 'openedx.ai.badges.editor.imageConfig.title',
+    defaultMessage: 'Image settings',
+    description: 'Title of the image configuration drawer',
+  },
+  'openedx.ai.badges.editor.imageConfig.shape.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.shape.label',
+    defaultMessage: 'Shape',
+    description: 'Label for the badge shape selector',
+  },
+  'openedx.ai.badges.editor.imageConfig.shape.auto': {
+    id: 'openedx.ai.badges.editor.imageConfig.shape.auto',
+    defaultMessage: 'Auto',
+    description: 'Auto option for badge shape (API decides)',
+  },
+  'openedx.ai.badges.editor.imageConfig.shape.hexagon': {
+    id: 'openedx.ai.badges.editor.imageConfig.shape.hexagon',
+    defaultMessage: 'Hexagon',
+    description: 'Hexagon shape option',
+  },
+  'openedx.ai.badges.editor.imageConfig.shape.circle': {
+    id: 'openedx.ai.badges.editor.imageConfig.shape.circle',
+    defaultMessage: 'Circle',
+    description: 'Circle shape option',
+  },
+  'openedx.ai.badges.editor.imageConfig.shape.rounded_rect': {
+    id: 'openedx.ai.badges.editor.imageConfig.shape.rounded_rect',
+    defaultMessage: 'Rectangle',
+    description: 'Rounded rectangle shape option',
+  },
+  'openedx.ai.badges.editor.imageConfig.colors.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.colors.label',
+    defaultMessage: 'Colors',
+    description: 'Section label for badge color pickers',
+  },
+  'openedx.ai.badges.editor.imageConfig.primaryColor.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.primaryColor.label',
+    defaultMessage: 'Primary color',
+    description: 'Label for primary color picker toggle',
+  },
+  'openedx.ai.badges.editor.imageConfig.secondaryColor.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.secondaryColor.label',
+    defaultMessage: 'Secondary color',
+    description: 'Label for secondary color picker toggle',
+  },
+  'openedx.ai.badges.editor.imageConfig.border.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.border.label',
+    defaultMessage: 'Border',
+    description: 'Section label for border width and color controls',
+  },
+  'openedx.ai.badges.editor.imageConfig.borderWidth.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.borderWidth.label',
+    defaultMessage: 'Width',
+    description: 'Label for border width slider',
+  },
+  'openedx.ai.badges.editor.imageConfig.borderColor.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.borderColor.label',
+    defaultMessage: 'Color',
+    description: 'Label for border color picker toggle',
+  },
+  'openedx.ai.badges.editor.imageConfig.ribbon.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.ribbon.label',
+    defaultMessage: 'Ribbon',
+    description: 'Label for ribbon type selector',
+  },
+  'openedx.ai.badges.editor.imageConfig.ribbon.auto': {
+    id: 'openedx.ai.badges.editor.imageConfig.ribbon.auto',
+    defaultMessage: 'Auto (random)',
+    description: 'Auto option for ribbon — API decides randomly',
+  },
+  'openedx.ai.badges.editor.imageConfig.ribbon.ribbon': {
+    id: 'openedx.ai.badges.editor.imageConfig.ribbon.ribbon',
+    defaultMessage: 'Ribbon',
+    description: 'Ribbon style option',
+  },
+  'openedx.ai.badges.editor.imageConfig.ribbon.ribbon_folded': {
+    id: 'openedx.ai.badges.editor.imageConfig.ribbon.ribbon_folded',
+    defaultMessage: 'Folded ribbon',
+    description: 'Folded ribbon style option',
+  },
+  'openedx.ai.badges.editor.imageConfig.ribbon.none': {
+    id: 'openedx.ai.badges.editor.imageConfig.ribbon.none',
+    defaultMessage: 'None',
+    description: 'No ribbon option',
+  },
+  'openedx.ai.badges.editor.imageConfig.reset': {
+    id: 'openedx.ai.badges.editor.imageConfig.reset',
+    defaultMessage: 'Reset to defaults',
+    description: 'Button to reset all image configuration fields to their default (auto) values',
+  },
+  'openedx.ai.badges.editor.imageConfig.openSettings': {
+    id: 'openedx.ai.badges.editor.imageConfig.openSettings',
+    defaultMessage: 'Image settings',
+    description: 'Accessible label for the image settings icon button next to Generate image',
+  },
+  'openedx.ai.badges.editor.imageConfig.mode.label': {
+    id: 'openedx.ai.badges.editor.imageConfig.mode.label',
+    defaultMessage: 'Style',
+    description: 'Label for the image generation mode selector (icon vs text)',
+  },
+  'openedx.ai.badges.editor.imageConfig.mode.icon': {
+    id: 'openedx.ai.badges.editor.imageConfig.mode.icon',
+    defaultMessage: 'Icon',
+    description: 'Icon-based image generation mode option',
+  },
+  'openedx.ai.badges.editor.imageConfig.mode.text': {
+    id: 'openedx.ai.badges.editor.imageConfig.mode.text',
+    defaultMessage: 'Text',
+    description: 'Text-overlay image generation mode option',
+  },
 });
 
 export default messages;
