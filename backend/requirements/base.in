@@ -7,3 +7,4 @@ django-filter      # Filtering for DRF
 edx-opaque-keys        # Open edX CourseKeyField
 requests           # HTTP client used by MITDCCProcessor
 openedx-events         # Open edX event bus signals (BADGE_AWARDED)
+openedx-events         # Open edX event bus signals

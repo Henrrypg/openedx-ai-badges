@@ -22,6 +22,7 @@ from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator im
 
 from openedx_ai_badges.processors.badge_processor import BadgeProcessor, SkillsProcessor
 from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
+from openedx_ai_badges.processors.openedx_events_processor import OpenEdXEventsProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -515,6 +516,53 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         self.session.save(update_fields=['metadata'])
 
         return {"response": badge, "status": "completed"}
+
+    def submit(self, input_data):  # pylint: disable=unused-argument
+        """
+        Emit the ``BADGE_GENERATION`` openedx-event for the badge stored in
+        the current session.
+
+        Called by the frontend "Submit Badge" button via ``action: 'submit'``.
+
+        Returns:
+            dict: Processor response on success, or error dict.
+        """
+        complete_info = self.session.metadata.get('complete_info', {})
+        badge_info = complete_info.get('badge', {})
+
+        if not badge_info:
+            return {
+                'error': 'No badge data found in session. Please generate a badge first.',
+                'status': 'error',
+            }
+
+        return self._emit_badge_generation(badge_info)
+
+    def _emit_badge_generation(self, badge_info: dict) -> dict:
+        """Emit the BADGE_GENERATION event and return the processor result."""
+        try:
+            result = OpenEdXEventsProcessor().emit_badge_generation(
+                course_id=self.course_id,
+                badge_info=badge_info,
+            )
+            if isinstance(result, dict) and (
+                result.get('status') == 'error' or 'error' in result
+            ):
+                error_message = result.get('error') or 'Failed to emit BADGE_GENERATION event.'
+                logger.error(
+                    "Failed to emit BADGE_GENERATION for course=%s: %s",
+                    self.course_id,
+                    error_message,
+                )
+                return {'error': error_message, 'status': 'error'}
+            logger.info("BADGE_GENERATION emitted for course=%s", self.course_id)
+            return result
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            logger.error(
+                "Failed to emit BADGE_GENERATION for course=%s: %s",
+                self.course_id, exc,
+            )
+            return {'error': f'Failed to emit BADGE_GENERATION event: {exc}', 'status': 'error'}
 
     def _get_course_context(self):
         """Run OpenEdXProcessor and return course context or error dict."""
