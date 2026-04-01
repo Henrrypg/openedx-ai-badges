@@ -36,12 +36,7 @@ class BadgeGenerationData:
             {
               "id":        str,
               "createdAt": str,   # ISO-8601
-              "badgeImage": {
-                "b64":    str,    # base-64 encoded PNG
-                "config": {
-                  "layers":      list[dict],
-                  "scaleFactor": int
-                }
+              "badgeImage": str,   # URL
               },
               "courseContext": {
                 "title":            str,
