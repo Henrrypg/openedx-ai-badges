@@ -83,3 +83,98 @@
     height: 100%;
   }
 }
+
+// Image configuration panel — slides down below the generate button
+.image-config-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.28s ease;
+
+  &--open {
+    max-height: 480px;
+  }
+
+  &__inner {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    &--indented {
+      padding-left: 0.75rem;
+    }
+
+    &--reset {
+      padding-top: 0.25rem;
+      justify-content: flex-end;
+    }
+  }
+
+  &__label {
+    font-size: 0.75rem;
+    white-space: nowrap;
+    min-width: 4.5rem;
+    color: #6b6b6b;
+    margin: 0;
+  }
+
+  &__color-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    color: #6b6b6b;
+    margin: 0;
+    cursor: pointer;
+    white-space: nowrap;
+    min-width: 4.5rem;
+  }
+
+  &__color-swatch {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: none;
+    border-radius: 4px;
+    padding: 0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  &__slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  &__slider {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0; // let flexbox size it — prevents intrinsic-width overflow
+  }
+
+  &__px {
+    font-size: 0.75rem;
+    min-width: 2.25rem;
+    text-align: right;
+    color: #6b6b6b;
+    flex-shrink: 0;
+  }
+
+  &__shape-btn {
+    font-size: 0.7rem !important;
+    padding: 0.15rem 0.4rem !important;
+    line-height: 1.4 !important;
+  }
+}

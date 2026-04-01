@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import {
-  Card, Icon, Spinner, Button,
+  Card, Icon, Spinner, Button, IconButton,
 } from '@openedx/paragon';
-import { WorkspacePremium } from '@openedx/paragon/icons';
+import { WorkspacePremium, Tune } from '@openedx/paragon/icons';
 import { services } from '@openedx/openedx-ai-extensions-ui';
 import { GeneratedBadge, BadgeImageResult, BadgeVersion } from '../types/badges';
 import { useImageGenerate, useApiStatus } from './data/apiHooks';
 import messages from './messages';
 import ApiStatusPanel from './components/ApiStatusPanel';
 import VersionThumbnails from './components/VersionThumbnails';
+import ImageConfigDrawer, {
+  DEFAULT_STATE, buildImageConfig, ImageConfigState,
+} from './components/ImageConfigDrawer';
 
 const toSrc = (image: BadgeImageResult) => (
   image.b64.startsWith('data:') ? image.b64 : `data:image/png;base64,${image.b64}`
@@ -39,6 +42,8 @@ const PreviewPanel = ({
   const [selectedVersionImage, setSelectedVersionImage] = useState<BadgeImageResult | null>(null);
   const [sessionImage, setSessionImage] = useState<BadgeImageResult | null>(null);
   const [localVersions, setLocalVersions] = useState<BadgeImageResult[]>([]);
+  const [imageConfigOpen, setImageConfigOpen] = useState(false);
+  const [imageConfigState, setImageConfigState] = useState<ImageConfigState>(DEFAULT_STATE);
   const prevGeneratedImage = useRef<BadgeImageResult | null>(generatedImage);
   const prevImageError = useRef<string | null>(null);
 
@@ -67,11 +72,19 @@ const PreviewPanel = ({
 
   const handleGenerateImage = () => {
     setSelectedVersionImage(null);
-    generateImage({
-      mode: 'icon_based',
-      badge_name: achievement?.name ?? '',
-      badge_description: achievement?.description ?? '',
-    });
+    const imageConfig = buildImageConfig(imageConfigState);
+    const { mode } = imageConfigState;
+    const basePayload = { mode, image_configuration: imageConfig };
+    const modePayload = mode === 'text_overlay'
+      ? {
+        short_title: achievement?.name ?? '',
+        achievement_phrase: achievement?.description ?? '',
+      }
+      : {
+        badge_name: achievement?.name ?? '',
+        badge_description: achievement?.description ?? '',
+      };
+    generateImage({ ...basePayload, ...modePayload });
   };
 
   // Combine badge versions from props with locally generated ones (deduplicated by base64)
@@ -132,7 +145,7 @@ const PreviewPanel = ({
         </Card.Body>
       </Card>
 
-      <div className="d-flex justify-content-center mb-3">
+      <div className="d-flex justify-content-center align-items-center gap-2 mb-3">
         <Button
           variant="primary"
           onClick={handleGenerateImage}
@@ -142,7 +155,22 @@ const PreviewPanel = ({
             ? intl.formatMessage(messages['openedx.ai.badges.editor.preview.generatingImage'])
             : intl.formatMessage(messages['openedx.ai.badges.editor.preview.generateImage'])}
         </Button>
+        <IconButton
+          src={Tune}
+          iconAs={Icon}
+          variant="secondary"
+          size="sm"
+          onClick={() => setImageConfigOpen((prev) => !prev)}
+          disabled={isGeneratingImage}
+          aria-label={intl.formatMessage(messages['openedx.ai.badges.editor.imageConfig.openSettings'])}
+        />
       </div>
+
+      <ImageConfigDrawer
+        isOpen={imageConfigOpen}
+        state={imageConfigState}
+        onChange={setImageConfigState}
+      />
 
       <VersionThumbnails
         images={allVersionImages.slice(0, 6)}
