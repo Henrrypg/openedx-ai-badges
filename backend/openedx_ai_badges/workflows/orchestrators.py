@@ -58,8 +58,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         """
         Resolve the badge, previous generated response, and course context for a regeneration call.
 
-        Looks up the badge by ``badge_id`` when provided; falls back to the
-        legacy ``complete_info`` key for backward compatibility.  Also fetches
+        Looks up the badge by ``badge_id`` when provided.  Also fetches
         (or reuses) the course context and validates that a prior badge
         definition exists before any expensive work is done.
 
@@ -77,12 +76,10 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
                 return {'error': f'Badge {badge_id} not found', 'status': 'error'}
             previous_generated_response = badge.get('generated_response', {})
         else:
-            if not self.session.metadata.get('complete_info'):
-                return {
-                    "error": "No previous generation found to regenerate from.",
-                    "status": "error",
-                }
-            previous_generated_response = self.session.metadata['complete_info'].get('generated_response', {})
+            return {
+                "error": "No previous generation found to regenerate from.",
+                "status": "error",
+            }
 
         has_subject = (previous_generated_response.get('credentialSubject')
                        or previous_generated_response.get('credential_subject'))
@@ -224,8 +221,7 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         input_data['previous_badge'] = credential_subject.get('achievement', {})
         input_data['previous_skills'] = previous_generated_response.get('skills', [])
 
-        complete_info = {}
-        complete_info['course_context'] = course_context
+        input_data['course_context'] = course_context
 
         generated_response = {
             'enable_skill_extraction': skills_requested,
@@ -243,26 +239,22 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             if isinstance(skills, dict) and 'error' in skills:
                 return skills
             generated_response['skills'] = skills
-        elif badge is not None:
+        else:
             generated_response['skills'] = previous_generated_response.get('skills', [])
 
         self._set_status_message("Generating badge definition...")
-        credential_subject = self._get_achievement(complete_info, input_data, regenerate=True)
+        credential_subject = self._get_achievement(input_data, input_data, regenerate=True)
         if isinstance(credential_subject, dict) and 'error' in credential_subject:
             return credential_subject
         generated_response['credentialSubject'] = credential_subject
 
-        complete_info['generated_response'] = generated_response
+        input_data['generated_response'] = generated_response
 
-        if badge is not None:
-            badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
-            badge['generated_response'] = generated_response  # pylint: disable=unsupported-assignment-operation
-            self.session.save(update_fields=['metadata'])
-            return {"response": badge, "status": "completed"}
-
-        self.session.metadata['complete_info'] = complete_info
+        badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
+        badge['generated_response'] = generated_response  # pylint: disable=unsupported-assignment-operation
         self.session.save(update_fields=['metadata'])
-        return {"response": complete_info, "status": "completed"}
+        return {"response": badge, "status": "completed"}
+
 
     def generate_image_async(self, input_data):
         """
