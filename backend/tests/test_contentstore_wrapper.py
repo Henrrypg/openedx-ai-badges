@@ -8,6 +8,17 @@ module load time (so CI doesn't fail).
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def clear_backend_cache():
+    """Clear the lru_cache on _get_backend between tests."""
+    from openedx_ai_badges.edxapp_wrapper.contentstore import _get_backend
+    _get_backend.cache_clear()
+    yield
+    _get_backend.cache_clear()
+
 
 class TestGetStaticContent:
 
@@ -33,6 +44,18 @@ class TestGetStaticContent:
             get_static_content()
 
         mock_import.assert_called_once_with("my.custom.backend")
+
+    def test_backend_is_cached_across_calls(self, settings):
+        fake_backend = MagicMock()
+        fake_backend.StaticContent = MagicMock()
+        settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = "fake.backend"
+
+        with patch("openedx_ai_badges.edxapp_wrapper.contentstore.import_module", return_value=fake_backend) as mock_import:
+            from openedx_ai_badges.edxapp_wrapper.contentstore import get_static_content
+            get_static_content()
+            get_static_content()
+
+        mock_import.assert_called_once()
 
 
 class TestUpdateCourseRunAsset:

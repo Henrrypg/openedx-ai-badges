@@ -30,10 +30,13 @@ def plugin_settings(settings):
     if badges_workflow_dir not in settings.WORKFLOW_TEMPLATE_DIRS:
         settings.WORKFLOW_TEMPLATE_DIRS.append(badges_workflow_dir)
 
-    # Wrappers for openedx-platform functions
+    # -------------------------
+    # Contentstore wrapper
+    # -------------------------
     settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = (
         "openedx_ai_badges.edxapp_wrapper.backends.contentstore_r_v1"
     )
+    settings.OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES = 1 * 1024 * 1024  # 1 MB
 
     # -------------------------
     # MIT DCC Badge API

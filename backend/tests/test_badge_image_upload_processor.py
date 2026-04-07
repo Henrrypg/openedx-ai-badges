@@ -78,9 +78,9 @@ class TestUploadImageToAssets:
 
         with patch("openedx_ai_badges.processors.badge_image_upload_processor.update_course_run_asset", mock_upload), \
              patch("openedx_ai_badges.processors.badge_image_upload_processor.get_static_content", mock_get_static), \
-             patch("openedx_ai_badges.processors.badge_image_upload_processor.CourseKey") as mock_ck:
+             patch.object(CourseKey, "from_string") as mock_from_string:
             processor.upload_image_to_assets(real_key, MINIMAL_PNG_B64, BADGE_ID)
-            mock_ck.from_string.assert_not_called()
+            mock_from_string.assert_not_called()
 
         assert mock_upload.call_args[0][0] is real_key
 
@@ -105,6 +105,18 @@ class TestUploadImageToAssets:
             url = processor.upload_image_to_assets(COURSE_ID_STR, MINIMAL_PNG_B64, BADGE_ID)
 
         assert url is None
+
+    def test_returns_none_when_image_exceeds_max_size(self, processor, settings):
+        settings.LMS_ROOT_URL = LMS_ROOT
+        settings.OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES = 1  # 1 byte limit
+        mock_upload, mock_get_static = _make_upload_mock()
+
+        with patch("openedx_ai_badges.processors.badge_image_upload_processor.update_course_run_asset", mock_upload), \
+             patch("openedx_ai_badges.processors.badge_image_upload_processor.get_static_content", mock_get_static):
+            url = processor.upload_image_to_assets(COURSE_ID_STR, MINIMAL_PNG_B64, BADGE_ID)
+
+        assert url is None
+        mock_upload.assert_not_called()
 
     def test_uploaded_file_has_correct_name_and_content_type(self, processor, settings):
         settings.LMS_ROOT_URL = LMS_ROOT

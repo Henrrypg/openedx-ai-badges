@@ -31,3 +31,14 @@ def plugin_settings(settings):
         settings.MIT_DCC_BADGE_API_HEALTH_URL = settings.ENV_TOKENS.get(
             "MIT_DCC_BADGE_API_HEALTH_URL", settings.MIT_DCC_BADGE_API_HEALTH_URL
         )
+
+    # -------------------------
+    # Contentstore wrapper
+    # -------------------------
+    if hasattr(settings, "ENV_TOKENS"):
+        settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = settings.ENV_TOKENS.get(
+            "OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND", settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND
+        )
+        settings.OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES = settings.ENV_TOKENS.get(
+            "OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES", settings.OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES
+        )

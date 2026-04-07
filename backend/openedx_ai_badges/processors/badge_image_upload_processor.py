@@ -41,9 +41,16 @@ class BadgeImageUploadProcessor:
             # Strip data URL prefix if present (e.g. "data:image/png;base64,...")
             if "," in b64_string:
                 b64_string = b64_string.split(",", 1)[1]
-            image_bytes = base64.b64decode(b64_string)
+            image_bytes = base64.b64decode(b64_string, validate=True)
         except Exception:  # pylint: disable=broad-except
             logger.exception("Failed to decode base64 badge image for badge %s", badge_id)
+            return None
+
+        max_size = getattr(settings, "OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES", 5 * 1024 * 1024)
+        if len(image_bytes) > max_size:
+            logger.error(
+                "Badge image for badge %s exceeds maximum allowed size (%d bytes)", badge_id, max_size
+            )
             return None
 
         filename = f"badge_{badge_id}.png"
