@@ -21,8 +21,10 @@ def clear_backend_cache():
 
 
 class TestGetStaticContent:
+    """Tests for the get_static_content wrapper."""
 
     def test_returns_static_content_from_backend(self, settings):
+        """StaticContent attribute of the configured backend is returned."""
         fake_backend = MagicMock()
         fake_static_content = MagicMock()
         fake_backend.StaticContent = fake_static_content
@@ -36,6 +38,7 @@ class TestGetStaticContent:
         assert result is fake_static_content
 
     def test_uses_configured_backend_setting(self, settings):
+        """The backend module path is taken from OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND."""
         fake_backend = MagicMock()
         settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = "my.custom.backend"
 
@@ -46,6 +49,7 @@ class TestGetStaticContent:
         mock_import.assert_called_once_with("my.custom.backend")
 
     def test_backend_is_cached_across_calls(self, settings):
+        """The backend module is imported only once regardless of how many times wrappers are called."""
         fake_backend = MagicMock()
         fake_backend.StaticContent = MagicMock()
         settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = "fake.backend"
@@ -59,8 +63,10 @@ class TestGetStaticContent:
 
 
 class TestUpdateCourseRunAsset:
+    """Tests for the update_course_run_asset wrapper."""
 
     def test_delegates_to_backend(self, settings):
+        """The call is forwarded to the backend and its return value is passed back."""
         fake_backend = MagicMock()
         fake_content = MagicMock()
         fake_backend.update_course_run_asset.return_value = fake_content
@@ -77,6 +83,7 @@ class TestUpdateCourseRunAsset:
         assert result is fake_content
 
     def test_passes_args_and_kwargs_through(self, settings):
+        """Positional and keyword arguments are forwarded unchanged to the backend."""
         fake_backend = MagicMock()
         settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = "fake.backend"
 
