@@ -42,7 +42,9 @@ class BadgeGenerationData:
           "id":        str,          # "urn:uuid:<badge_id>"
           "type":      ["VerifiableCredential", "OpenBadgeCredential"],
           "name":      str,          # achievement name
+          "image":     str,          # data URI (data:image/png;base64,...)
           "validFrom": str,          # ISO-8601 timestamp
+          "issuer":    dict,
           "credentialSubject": {
             "type": ["AchievementSubject"],
             "achievement": {
