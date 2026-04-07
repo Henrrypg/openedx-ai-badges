@@ -16,7 +16,7 @@ const fallbackSrc = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAA
 
 const BadgeCard = ({ className, original: badge, onEdit }: BadgeCardProps) => {
   const intl = useIntl();
-  const { badgeImage } = badge;
+  const { badgeImage, image } = badge;
   const name = badge.generatedResponse?.credentialSubject?.achievement?.name
     ?? intl.formatMessage(messages['openedx.ai.badges.card.untitled']);
   const description = badge.generatedResponse?.credentialSubject?.achievement?.description ?? '';
@@ -26,6 +26,8 @@ const BadgeCard = ({ className, original: badge, onEdit }: BadgeCardProps) => {
   if (badgeImage) {
     const { b64 } = badgeImage;
     imageSrc = b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}`;
+  } else if (image?.id) {
+    imageSrc = image.id;
   }
 
   return (

@@ -69,6 +69,7 @@ const PreviewPanel = ({
   const canGenerateImage = !!achievement?.description;
 
   const currentImage: BadgeImageResult | null = selectedVersionImage ?? sessionImage ?? badge?.badgeImage ?? null;
+  const currentSrc: string | null = currentImage ? toSrc(currentImage) : (badge?.image?.id ?? null);
 
   const handleGenerateImage = () => {
     setSelectedVersionImage(null);
@@ -102,7 +103,7 @@ const PreviewPanel = ({
 
       <Card className="mb-3">
         <Card.Body className="badge-preview__image-area d-flex flex-column align-items-center justify-content-center">
-          {isGeneratingImage && !currentImage && (
+          {isGeneratingImage && !currentSrc && (
             <div className="d-flex flex-column align-items-center py-5">
               <Spinner
                 animation="border"
@@ -114,7 +115,7 @@ const PreviewPanel = ({
             </div>
           )}
 
-          {!isGeneratingImage && !currentImage && (
+          {!isGeneratingImage && !currentSrc && (
             <div className="d-flex flex-column align-items-center py-5 text-muted">
               <Icon src={WorkspacePremium} className="mb-2" />
               <p className="small mb-0">
@@ -123,10 +124,10 @@ const PreviewPanel = ({
             </div>
           )}
 
-          {currentImage && (
+          {currentSrc && (
             <div className="position-relative">
               <img
-                src={toSrc(currentImage)}
+                src={currentSrc}
                 alt={intl.formatMessage(messages['openedx.ai.badges.editor.preview.imageAlt'])}
                 className="img-fluid rounded"
               />
