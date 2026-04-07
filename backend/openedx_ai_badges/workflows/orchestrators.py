@@ -19,6 +19,7 @@ from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator im
     _execute_orchestrator_async,
 )
 
+from openedx_ai_badges.processors.badge_image_upload_processor import BadgeImageUploadProcessor
 from openedx_ai_badges.processors.badge_processor import BadgeProcessor, SkillsProcessor
 from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
 from openedx_ai_badges.processors.openedx_events_processor import OpenEdXEventsProcessor
