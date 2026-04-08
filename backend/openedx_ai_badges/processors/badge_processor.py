@@ -109,7 +109,7 @@ class SkillsProcessor(BaseBadgeLLMProcessor):
         POSTs context to /laiser, polls /result until a terminal state, then
         normalizes the result array into the internal skills alignment format.
         """
-        base_url = self.config.get("base_url") or getattr(settings, "LAISER_API_BASE_URL", "")
+        base_url = (self.config.get("base_url") or getattr(settings, "LAISER_API_BASE_URL", "")).rstrip("/")
         api_key = self.config.get("api_key") or getattr(settings, "LAISER_API_KEY", "")
 
         if not base_url or not api_key:
@@ -169,8 +169,13 @@ class SkillsProcessor(BaseBadgeLLMProcessor):
                 logger.error("LAiSER API poll returned non-JSON (jobId=%s): %s", job_id, exc)
                 return {"error": f"Invalid JSON from LAiSER poll: {exc}"}
 
-            if data.get("status") in ("QUEUED", "RUNNING"):
+            status = data.get("status")
+            if status in ("QUEUED", "RUNNING"):
                 continue
+
+            if status != "SUCCEEDED":
+                logger.error("LAiSER API job terminal failure (jobId=%s): status=%s", job_id, status)
+                return {"error": f"LAiSER job failed with status: {status}"}
 
             return data
 

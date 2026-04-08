@@ -258,6 +258,14 @@ class TestPollLaiserJob:
 
     @patch("openedx_ai_badges.processors.badge_processor.time.sleep")
     @patch("openedx_ai_badges.processors.badge_processor.requests.get")
+    def test_terminal_failure_status_returns_error(self, mock_get, _sleep, processor):
+        mock_get.return_value = _mock_response({"status": "FAILED", "jobId": "abc-123"})
+        result = processor._poll_laiser_job("https://api.example.com/dev", "key", "abc-123")
+        assert "error" in result
+        assert "FAILED" in result["error"]
+
+    @patch("openedx_ai_badges.processors.badge_processor.time.sleep")
+    @patch("openedx_ai_badges.processors.badge_processor.requests.get")
     def test_job_id_sent_as_query_param(self, mock_get, _sleep, processor):
         mock_get.return_value = _mock_response(POLL_SUCCEEDED)
         processor._poll_laiser_job("https://api.example.com/dev", "key", "abc-123")
