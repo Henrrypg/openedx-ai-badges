@@ -112,6 +112,7 @@ export interface GeneratedBadge {
   courseContext?: CourseContext;
   generatedResponse?: GeneratedResponse;
   badgeImage?: BadgeImageResult;
+  image?: { id: string };
   status?: BadgeStatus;
   versions?: BadgeVersion[];
   [key: string]: unknown;
@@ -192,6 +193,7 @@ export interface PersistedBadge {
   courseContext?: CourseContext;
   generatedResponse?: GeneratedResponse;
   badgeImage?: BadgeImageResult;
+  image?: { id: string };
 }
 
 /** Form data shape used by the Studio/Editor view. */

@@ -31,6 +31,14 @@ def plugin_settings(settings):
         settings.WORKFLOW_TEMPLATE_DIRS.append(badges_workflow_dir)
 
     # -------------------------
+    # Contentstore wrapper
+    # -------------------------
+    settings.OPENEDX_AI_BADGES_CONTENTSTORE_BACKEND = (
+        "openedx_ai_badges.edxapp_wrapper.backends.contentstore_r_v1"
+    )
+    settings.OPENEDX_AI_BADGES_MAX_IMAGE_SIZE_BYTES = 1 * 1024 * 1024  # 1 MB
+
+    # -------------------------
     # MIT DCC Badge API
     # -------------------------
     settings.MIT_DCC_BADGE_API_URL = "http://mit-slm:8000/api/v1/generate-badge-suggestions"

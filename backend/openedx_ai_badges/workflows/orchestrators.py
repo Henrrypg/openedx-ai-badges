@@ -19,6 +19,7 @@ from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator im
     _execute_orchestrator_async,
 )
 
+from openedx_ai_badges.processors.badge_image_upload_processor import BadgeImageUploadProcessor
 from openedx_ai_badges.processors.badge_processor import BadgeProcessor, SkillsProcessor
 from openedx_ai_badges.processors.mit_dcc_processor import MITDCCProcessor
 from openedx_ai_badges.processors.openedx_events_processor import OpenEdXEventsProcessor
@@ -48,6 +49,29 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
             if badge['id'] == badge_id:
                 return i, badge
         return None, None
+
+    def _pre_publish_cleanup(self, badge):
+        """
+        Prepare a badge for publishing.
+
+        Clears draft image versions, uploads the base64 image to the course
+        asset store, and replaces the raw ``badge_image`` entry with a clean
+        ``image`` dict containing only the resulting public URL.
+
+        Modifies *badge* in place; caller is responsible for saving the session.
+
+        Args:
+            badge (dict): The badge entry from session metadata.
+        """
+        badge.pop('versions', None)
+        b64 = badge.get('badge_image', {}).get('b_64')
+        if b64:
+            url = BadgeImageUploadProcessor().upload_image_to_assets(
+                self.course_id, b64, badge['id']
+            )
+            if url:
+                badge.pop('badge_image', None)
+                badge['image'] = {'id': url}
 
     def _set_image_status_message(self, message):
         """Write an intermediate status message for image generation polling."""
@@ -153,18 +177,23 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         if 'badge_image' in input_data and input_data['badge_image']:
             new_image = input_data['badge_image']
             current_image = badge.get('badge_image')
-            if not current_image or current_image.get('b64') != new_image.get('b64'):
-                badge.setdefault('versions', []).insert(0, {
+            if not current_image or current_image.get('b_64') != new_image.get('b_64'):
+                versions = badge.setdefault('versions', [])
+                versions.insert(0, {
                     'id': str(uuid.uuid4()),
                     'badge_image': new_image,
                     'created_at': datetime.now(timezone.utc).isoformat(),
                 })
+                badge['versions'] = versions[:5]
             badge['badge_image'] = new_image
 
         badge['status'] = status
+
         self.session.save(update_fields=['metadata'])
 
         if status == 'published':
+            self._pre_publish_cleanup(badge)
+            self.session.save(update_fields=['metadata'])
             self._emit_badge_generation(badge)
 
         return {"response": badge, "status": "saved"}

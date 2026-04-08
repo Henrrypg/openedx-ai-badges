@@ -37,6 +37,8 @@ autodoc_mock_imports = [
     "openedx",
     "common",
     "openedx_ai_extensions",
+    "xmodule",
+    "cms",
 ]
 
 def get_version(*file_paths):
