@@ -696,18 +696,6 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
             }
         }
 
-    def _add_badge_from_complete_info(self, complete_info):
-        """Create a draft badge entry from a completed generation result and append it to the badges list."""
-        badge = {
-            'id': str(uuid.uuid4()),
-            'status': 'draft',
-            'created_at': datetime.now(timezone.utc).isoformat(),
-            'versions': [],
-            **complete_info,
-        }
-        self._get_badges().append(badge)
-        return badge
-
     def run(self, input_data):
         """
         Execute badge generation via the MIT DCC remote API.
@@ -733,16 +721,11 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         if isinstance(api_result, dict) and 'error' in api_result:
             return {**api_result, 'status': 'error'}
 
-        complete_info = {
-            'course_context': course_context,
-            'generated_response': api_result,
-        }
+        input_data['course_context'] = course_context
+        input_data['generated_response'] = api_result
 
-        self.session.metadata['complete_info'] = complete_info
-        badge = self._add_badge_from_complete_info(complete_info)
-        self.session.save(update_fields=['metadata'])
-
-        return {"response": badge, "status": "completed"}
+        response = self.save_badge(input_data)
+        return {"response": response.get("response", {}), "status": "completed"}
 
     def regenerate(self, input_data):
         """
@@ -774,16 +757,8 @@ class MITDCCBadgeOrchestrator(BadgeOrchestrator):
         if isinstance(api_result, dict) and 'error' in api_result:
             return {**api_result, 'status': 'error'}
 
-        if badge is not None:
-            badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
-            badge['generated_response'] = api_result  # pylint: disable=unsupported-assignment-operation
-            self.session.save(update_fields=['metadata'])
-            return {"response": badge, "status": "completed"}
+        badge['course_context'] = course_context  # pylint: disable=unsupported-assignment-operation
+        badge['generated_response'] = api_result  # pylint: disable=unsupported-assignment-operation
 
-        complete_info = {
-            'course_context': course_context,
-            'generated_response': api_result,
-        }
-        self.session.metadata['complete_info'] = complete_info
         self.session.save(update_fields=['metadata'])
-        return {"response": complete_info, "status": "completed"}
+        return {"response": badge, "status": "completed"}
