@@ -14,6 +14,8 @@ from urllib.parse import urlparse
 import requests
 from django.conf import settings
 from openedx_ai_extensions.processors import OpenEdXProcessor
+from openedx_ai_extensions.workflows.models import AIWorkflowSession
+from openedx_ai_extensions.workflows.orchestrators.base_orchestrator import BaseOrchestrator as _BaseOrchestrator
 from openedx_ai_extensions.workflows.orchestrators.session_based_orchestrator import (
     SessionBasedOrchestrator,
     _execute_orchestrator_async,
@@ -32,6 +34,25 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
     Orchestrator to generate Open Badges 3.0 BadgeClass
     based on course context and optional skills.
     """
+
+    def __init__(self, workflow, user, context):
+        _BaseOrchestrator.__init__(self, workflow, user, context)
+        # Course-scoped session: shared across all staff on the same course.
+        # The first caller's user satisfies the non-nullable FK today; once
+        # AIWorkflowSession.user becomes nullable this line changes to user=None.
+        self.session = AIWorkflowSession.objects.filter(
+            scope=self.workflow,
+            profile=self.workflow.profile,
+            course_id=self.course_id,
+        ).order_by('created_at').first()
+
+        if self.session is None:
+            self.session = AIWorkflowSession.objects.create(
+                user=self.user,
+                scope=self.workflow,
+                profile=self.workflow.profile,
+                course_id=self.course_id,
+            )
 
     # ------------------------------------------------------------------
     # Badge list helpers

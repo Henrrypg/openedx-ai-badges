@@ -43,7 +43,7 @@ POLL_SUCCEEDED = {
 @pytest.fixture
 def processor():
     """Return a SkillsProcessor with config and context set as they would be during process()."""
-    p = SkillsProcessor({"SkillsProcessor": {"function": "generate_skills_laiser_api"}})
+    p = object.__new__(SkillsProcessor)
     p.config = {"function": "generate_skills_laiser_api"}
     p.context = json.dumps({"title": "Test Course", "description": "A test course."})
     p.input_data = None
