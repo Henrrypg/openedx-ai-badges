@@ -40,11 +40,24 @@ class BadgeOrchestrator(SessionBasedOrchestrator):
         # Course-scoped session: shared across all staff on the same course.
         # The first caller's user satisfies the non-nullable FK today; once
         # AIWorkflowSession.user becomes nullable this line changes to user=None.
-        self.session = AIWorkflowSession.objects.filter(
-            scope=self.workflow,
-            profile=self.workflow.profile,
-            course_id=self.course_id,
-        ).order_by('created_at').first()
+        # Two-step lookup: fetch only the PK first so MySQL never buffers the
+        # large metadata column during the sort, then load the full row by PK.
+        session_id = (
+            AIWorkflowSession.objects
+            .filter(
+                scope=self.workflow,
+                profile=self.workflow.profile,
+                course_id=self.course_id,
+            )
+            .order_by('created_at')
+            .values_list('id', flat=True)
+            .first()
+        )
+        self.session = (
+            AIWorkflowSession.objects.filter(id=session_id).first()
+            if session_id is not None
+            else None
+        )
 
         if self.session is None:
             self.session = AIWorkflowSession.objects.create(
