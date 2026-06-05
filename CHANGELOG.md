@@ -1,17 +1,6 @@
-Change Log
-##########
+# Changelog
 
-..
-   All enhancements and patches to openedx_ai_badges will be documented
-   in this file.  It adheres to the structure of https://keepachangelog.com/ ,
-   but in reStructuredText instead of Markdown (for ease of incorporation into
-   Sphinx documentation and the PyPI description).
+All notable changes to this project will be documented in this file.
 
-   This project adheres to Semantic Versioning (https://semver.org/).
-
-.. There should always be an "Unreleased" section for changes pending release.
-
-Unreleased
-**********
-
-*
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
