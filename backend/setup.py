@@ -31,7 +31,7 @@ def load_requirements(*requirements_paths):
     """
     Load all requirements from the specified requirements files.
 
-    Requirements will include any constraints from files specified ddcccx
+    Requirements will include any constraints from files specified
     with -c in the requirements files.
     Returns a list of requirement strings.
     """
