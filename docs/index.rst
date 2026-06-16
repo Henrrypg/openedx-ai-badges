@@ -21,7 +21,6 @@ Contents:
    testing
    internationalization
    openedx_ai_badges
-   changelog
    decisions
    references/index
 
